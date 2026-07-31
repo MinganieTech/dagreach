@@ -97,10 +97,9 @@ than answering backwards.
 
 ## Adding a profile
 
-A profile is a module in `src/dagreach/adapters/` exporting a `PROFILE` object with five things:
-the name, what produces it, its edge semantics, a `load(text, source) -> Graph`, and a `detect`
-that recognises the format from its first few thousand characters — or returns `False` rather than
-guessing.
+A profile is an entry in `internal/dagreach/adapters.go` with five things: the name, what produces
+it, its edge semantics, a `Load(text, source) (*Graph, error)`, and a `Detect` that recognises the
+format from its first few thousand characters — or returns `false` rather than guessing.
 
 Two rules make a profile trustworthy rather than magic:
 
