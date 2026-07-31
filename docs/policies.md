@@ -125,7 +125,11 @@ new edge is required for a policy to fail, and the report always says which of t
 | `new-node` | the target did not exist in `before` |
 | `new-edge` | an edge on the witness path did not exist in `before`; the edge is named |
 | `reclassified` | already reachable, and the selector attribute changed; both values are named |
-| `newly-reachable` | defensive last resort, not expected to occur |
+
+The three are exhaustive: a target reached now that was not exposed before either did not exist,
+or was reached over an edge that did not exist, or was already reachable and changed
+classification. A path made only of pre-existing edges, from a seed that already existed, cannot
+open a route.
 
 ### The cost
 
