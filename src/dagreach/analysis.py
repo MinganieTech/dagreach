@@ -83,10 +83,10 @@ def reachable(
     return [node for node in graph.nodes if node in found]
 
 
-def strongly_connected_cycles(
+def strongly_connected_components(
     graph: Graph, *, adjacency: Adjacency | None = None
 ) -> list[list[str]]:
-    """Cycles, as strongly connected components of more than one node, plus self-loops.
+    """Every strongly connected component, each in declaration order.
 
     Tarjan's algorithm, iterative: a deep dependency graph must not blow the
     Python stack.
@@ -97,7 +97,8 @@ def strongly_connected_cycles(
     on_stack: set[str] = set()
     component_stack: list[str] = []
     counter = 0
-    cycles: list[list[str]] = []
+    components: list[list[str]] = []
+    declared_at = {node: position for position, node in enumerate(graph.nodes)}
 
     for root in graph.nodes:
         if root in index_of:
@@ -134,13 +135,25 @@ def strongly_connected_cycles(
                     component.append(member)
                     if member == node:
                         break
-                if len(component) > 1:
-                    cycles.append(sorted(component))
+                component.sort(key=declared_at.__getitem__)
+                components.append(component)
 
+    return components
+
+
+def strongly_connected_cycles(
+    graph: Graph, *, adjacency: Adjacency | None = None
+) -> list[list[str]]:
+    """The components that are actually cycles: more than one node, or a self-loop."""
+    adjacency = adjacency or build_adjacency(graph)
+    cycles = [
+        component
+        for component in strongly_connected_components(graph, adjacency=adjacency)
+        if len(component) > 1
+    ]
     for edge in graph.edges:
         if edge.source == edge.target:
             cycles.append([edge.source])
-
     return cycles
 
 
@@ -241,6 +254,126 @@ def articulation_points(graph: Graph, *, adjacency: Adjacency | None = None) -> 
 
 
 # --------------------------------------------------------------------------
+# explanations
+# --------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class WitnessIndex:
+    """Why each node is in the answer: a shortest path from one of the seeds.
+
+    Only the parent link and the distance are kept, so memory stays linear; the
+    path itself is rebuilt for the nodes actually shown.
+    """
+
+    came_from: dict[str, str | None]
+    distance: dict[str, int]
+
+    def path(self, node: str) -> list[str]:
+        """A shortest witness path, from the seed that reached `node`, to `node`."""
+        if node not in self.came_from:
+            return []
+        path = [node]
+        while self.came_from[path[-1]] is not None:
+            path.append(self.came_from[path[-1]])  # type: ignore[arg-type]
+        path.reverse()
+        return path
+
+
+def witnesses(
+    graph: Graph, seeds: list[str], direction: str, *, adjacency: Adjacency | None = None
+) -> WitnessIndex:
+    """Breadth-first from every seed at once: the shortest reason each node is reached.
+
+    Breadth-first rather than depth-first on purpose — the shortest witness is
+    the one a human checks fastest — and neighbours are walked in declaration
+    order, so the witness for a given file never changes between runs.
+    """
+    adjacency = adjacency or build_adjacency(graph)
+    came_from: dict[str, str | None] = {}
+    distance: dict[str, int] = {}
+    queue: list[str] = []
+    for seed in seeds:
+        if seed in came_from:
+            continue
+        came_from[seed] = None
+        distance[seed] = 0
+        queue.append(seed)
+
+    head = 0
+    while head < len(queue):
+        node = queue[head]
+        head += 1
+        for neighbour in adjacency.neighbours(node, direction):
+            if neighbour in came_from:
+                continue
+            came_from[neighbour] = node
+            distance[neighbour] = distance[node] + 1
+            queue.append(neighbour)
+
+    return WitnessIndex(came_from, distance)
+
+
+# --------------------------------------------------------------------------
+# condensation
+# --------------------------------------------------------------------------
+
+
+def condensed_name(component: list[str]) -> str:
+    """A stable name for a collapsed cycle, readable in a report."""
+    if len(component) == 1:
+        return component[0]
+    return f"scc({component[0]}+{len(component) - 1})"
+
+
+def condense(graph: Graph, *, adjacency: Adjacency | None = None) -> tuple[Graph, dict[str, str]]:
+    """Collapse every cycle into one node, so that path metrics stay meaningful.
+
+    Reachability never needs this — it is well defined with cycles — but "the
+    longest path" is not, so the metrics that require an acyclic graph are
+    computed on the condensation and say so. A collapsed cycle costs the sum of
+    its members' durations, since all of them have to happen.
+    """
+    adjacency = adjacency or build_adjacency(graph)
+    components = strongly_connected_components(graph, adjacency=adjacency)
+
+    member_of: dict[str, str] = {}
+    condensed = Graph(
+        name=graph.name,
+        directed=graph.directed,
+        source=graph.source,
+        format=graph.format,
+        edge_semantics=graph.edge_semantics,
+    )
+
+    for component in components:
+        name = condensed_name(component)
+        for member in component:
+            member_of[member] = name
+        attrs: dict[str, str] = {}
+        durations = [duration_of(graph.nodes[member]) for member in component]
+        declared = [value for value in durations if value is not None]
+        if declared:
+            attrs["duration"] = format_number(sum(declared))
+        groups = {group_of(graph.nodes[member]) for member in component}
+        if len(groups) == 1:
+            only = groups.pop()
+            if only:
+                attrs["group"] = only
+        condensed.add_node(name, attrs)
+
+    seen: set[tuple[str, str]] = set()
+    for edge in graph.edges:
+        source, target = member_of[edge.source], member_of[edge.target]
+        if source == target or (source, target) in seen:
+            continue
+        seen.add((source, target))
+        condensed.add_edge(source, target, dict(edge.attrs))
+
+    return condensed, member_of
+
+
+# --------------------------------------------------------------------------
 # paths
 # --------------------------------------------------------------------------
 
@@ -261,12 +394,17 @@ class CriticalPath:
     def unit(self) -> str:
         return "duration" if self.weighted else "edges"
 
+    @property
+    def label(self) -> str:
+        """Weighted paths are critical; unweighted ones are only the longest."""
+        return "critical path" if self.weighted else "longest path"
+
     def describe(self) -> str:
         if not self.nodes:
             return "no path"
         if self.weighted:
             return f"{format_number(self.cost)} of duration over {self.edges} edge(s)"
-        return f"{self.edges} edge(s), unweighted"
+        return f"{self.edges} edge(s), structural (no durations declared)"
 
 
 def uses_durations(graph: Graph) -> bool:
@@ -384,6 +522,8 @@ class GraphStats:
     articulation_points: list[str]
     critical_path: CriticalPath | None
     groups: dict[str, int]
+    condensed: bool = False
+    collapsed_cycles: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def acyclic(self) -> bool:
@@ -393,7 +533,17 @@ class GraphStats:
 def analyse(graph: Graph) -> GraphStats:
     adjacency = build_adjacency(graph)
     cycles = strongly_connected_cycles(graph, adjacency=adjacency)
-    levels = topological_levels(graph, adjacency=adjacency)
+
+    work, work_adjacency = graph, adjacency
+    collapsed: dict[str, list[str]] = {}
+    if cycles:
+        work, member_of = condense(graph, adjacency=adjacency)
+        work_adjacency = build_adjacency(work)
+        for member, name in member_of.items():
+            if name != member:
+                collapsed.setdefault(name, []).append(member)
+
+    levels = topological_levels(work, adjacency=work_adjacency)
 
     roots = [n for n in graph.nodes if not adjacency.predecessors[n]]
     leaves = [n for n in graph.nodes if not adjacency.successors[n]]
@@ -420,8 +570,10 @@ def analyse(graph: Graph) -> GraphStats:
         width=len(widest) if levels else None,
         widest_level=widest,
         articulation_points=articulation_points(graph, adjacency=adjacency),
-        critical_path=critical_path(graph, adjacency=adjacency) if not cycles else None,
+        critical_path=critical_path(work, adjacency=work_adjacency),
         groups=groups,
+        condensed=bool(cycles),
+        collapsed_cycles=collapsed,
     )
 
 
@@ -438,6 +590,7 @@ class ImpactReport:
     cost: float | None
     critical_path: CriticalPath | None
     total_nodes: int
+    witnesses: WitnessIndex = field(default_factory=lambda: WitnessIndex({}, {}))
 
     @property
     def impacted(self) -> list[str]:
@@ -451,8 +604,12 @@ class ImpactReport:
 
 def impact(graph: Graph, seeds: list[str]) -> ImpactReport:
     adjacency = build_adjacency(graph)
-    ordered_seeds = [node for node in graph.nodes if node in set(seeds)]
-    downstream = reachable(graph, ordered_seeds, "down", adjacency=adjacency)
+    seed_set = set(seeds)
+    ordered_seeds = [node for node in graph.nodes if node in seed_set]
+    witness_index = witnesses(graph, ordered_seeds, "down", adjacency=adjacency)
+    downstream = [
+        node for node in graph.nodes if node in witness_index.came_from and node not in seed_set
+    ]
     upstream = reachable(graph, ordered_seeds, "up", adjacency=adjacency)
 
     impacted = set(ordered_seeds) | set(downstream)
@@ -481,6 +638,7 @@ def impact(graph: Graph, seeds: list[str]) -> ImpactReport:
         cost=cost,
         critical_path=critical_path(graph, adjacency=adjacency, within=impacted),
         total_nodes=graph.node_count,
+        witnesses=witness_index,
     )
 
 

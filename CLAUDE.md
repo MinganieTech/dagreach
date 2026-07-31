@@ -8,7 +8,8 @@ Conversation with the owner happens in French; the artifacts never do.
 
 ## Scope discipline
 
-`dagreach` answers one question: **what does a change reach in a DAG, and what does that cost?**
+`dagreach` answers one question: **what can this change reach, why, and should CI allow it?**
+The metrics exist to support that decision; they are not the product.
 
 - Inputs are files (DOT, JSON Graph Format). No database, no daemon, no runtime dependency on any
   orchestrator. Everything must work offline.
@@ -26,8 +27,15 @@ Conversation with the owner happens in French; the artifacts never do.
   (bipartite matching), spectral bottlenecks — and that decision gets written down here first.
 - **Printed text is ASCII.** A Windows console on a legacy code page renders anything else as `?`.
   Docstrings and documentation are free; CLI output is not, and a test enforces it.
-- **Exit codes are a public contract** (`0` ok, `2` usage error, `3` not implemented, `4` the input
-  could not be read). CI pipelines depend on them; changing one is a breaking change.
+- **Exit codes are a public contract** (`0` ok, `1` a policy failed, `2` usage error, `3` not
+  implemented, `4` the input could not be read). CI pipelines depend on them; changing one is a
+  breaking change. A broken selector or a missing file must never exit `1`: an unusable input must
+  not be indistinguishable from a clean gate.
+- **Never guess which way an edge points.** The orientation applied is stated in every report, and
+  a file whose shape contradicts it raises a warning. A graph read backwards produces confident,
+  fluent nonsense - the worst failure this tool can have.
+- **Every decision carries its evidence.** A policy verdict ships the matching nodes and a witness
+  path. A gate that cannot explain itself gets disabled by the team that depends on it.
 - **A recoverable oddity is a warning, never a failure and never a silence.** Readers record what
   they had to work around and the commands surface it. Anything accepted beyond a specification
   says so in the warning.
