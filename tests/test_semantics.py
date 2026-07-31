@@ -66,7 +66,11 @@ def test_reading_that_same_file_as_feeds_answers_the_opposite_question():
 
 
 def test_the_applied_orientation_is_always_stated(capsys):
-    assert main(["impact", str(FIXTURES / "terraform.dot"), "--changed", VPC]) == EXIT_OK
+    """Read as generic, the same file needs the flag - and says which way it went."""
+    assert (
+        main(["impact", str(FIXTURES / "terraform.dot"), "--profile", "generic", "--changed", VPC])
+        == EXIT_OK
+    )
     out = capsys.readouterr().out
     assert "edges: source feeds target, so impact follows edges forward" in out
 
@@ -75,6 +79,8 @@ def test_the_applied_orientation_is_always_stated(capsys):
             [
                 "impact",
                 str(FIXTURES / "terraform.dot"),
+                "--profile",
+                "generic",
                 "--changed",
                 VPC,
                 "--edge-semantics",

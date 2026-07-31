@@ -47,7 +47,21 @@ def path_line(nodes: list[str], limit: int) -> str:
 
 
 def edge_semantics_line(graph: Graph) -> str:
-    return f"edges: {_ORIENTATION[graph.edge_semantics]}"
+    profile = f"{graph.profile} profile, " if graph.profile and graph.profile != "generic" else ""
+    return f"edges: {profile}{_ORIENTATION[graph.edge_semantics]}"
+
+
+def profiles_text(profiles: dict[str, Any]) -> list[str]:
+    """The `dagreach profiles` listing: what each profile reads, and which way it points."""
+    lines = ["profiles:"]
+    width = max(len(name) for name in profiles)
+    for name, profile in profiles.items():
+        lines.append(f"  {name.ljust(width)}  reads {profile.produced_by}")
+        lines.append(f"  {' ' * width}  edges: {profile.edge_semantics}; {profile.summary}")
+    lines.append("")
+    lines.append("A profile is detected from the file when --profile is omitted, and the report")
+    lines.append("always says which one was applied. --edge-semantics overrides it.")
+    return lines
 
 
 # --------------------------------------------------------------------------
@@ -94,6 +108,7 @@ def parse_json(graph: Graph, summary: ProfileSummary) -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "source": graph.source,
         "format": graph.format,
+        "profile": graph.profile,
         "name": graph.name,
         "directed": graph.directed,
         "edge_semantics": graph.edge_semantics,
@@ -101,7 +116,7 @@ def parse_json(graph: Graph, summary: ProfileSummary) -> dict[str, Any]:
         "edges": graph.edge_count,
         "self_loops": len(graph.self_loops()),
         "duplicate_edges": len(graph.duplicate_edges()),
-        "profile": {
+        "attributes": {
             "nodes_with_duration": summary.nodes_with_duration,
             "edges_with_duration": summary.edges_with_duration,
             "statuses": dict(summary.statuses),
@@ -167,6 +182,7 @@ def stats_json(graph: Graph, stats: GraphStats, policies: list[PolicyResult]) ->
     return {
         "schema_version": SCHEMA_VERSION,
         "source": graph.source,
+        "profile": graph.profile,
         "edge_semantics": graph.edge_semantics,
         "nodes": stats.nodes,
         "edges": stats.edges,
@@ -268,6 +284,7 @@ def impact_json(
     document: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "source": graph.source,
+        "profile": graph.profile,
         "edge_semantics": graph.edge_semantics,
         "changed": report.seeds,
         "impacted": report.impacted,
@@ -442,6 +459,7 @@ def diff_json(
         "schema_version": SCHEMA_VERSION,
         "before": before.source,
         "after": after.source,
+        "profile": after.profile,
         "edge_semantics": after.edge_semantics,
         "changed": diff.seeds,
         "changed_missing_before": diff.seeds_missing_before,

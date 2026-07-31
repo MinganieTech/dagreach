@@ -47,7 +47,7 @@ def test_parse_json_report_is_machine_readable(capsys):
     assert report["format"] == "dot"
     assert report["nodes"] == 8
     assert report["self_loops"] == 1
-    assert report["profile"]["statuses"] == {"ready": 2, "blocked": 1}
+    assert report["attributes"]["statuses"] == {"ready": 2, "blocked": 1}
     assert any("collapsed" in warning for warning in report["warnings"])
 
 
