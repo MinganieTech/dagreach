@@ -74,7 +74,8 @@ def test_unweighted_critical_path_counts_edges():
     assert path.weighted is False
     assert path.nodes == ["a", "b", "c", "d"]
     assert path.edges == 3
-    assert "unweighted" in path.describe()
+    assert path.label == "longest path"
+    assert "structural (no durations declared)" in path.describe()
 
 
 def test_weighted_critical_path_follows_the_slowest_branch():
@@ -129,13 +130,17 @@ def test_analyse_reports_the_shape_of_a_graph():
     assert stats.isolated == []
 
 
-def test_analyse_degrades_gracefully_on_a_cyclic_graph():
+def test_analyse_condenses_cycles_rather_than_giving_up():
     stats = analyse(graph_of("digraph { a -> b -> c -> a; c -> d }"))
     assert stats.acyclic is False
     assert stats.cycles == [["a", "b", "c"]]
-    assert stats.depth is None
-    assert stats.width is None
-    assert stats.critical_path is None
+    assert stats.condensed is True
+    assert stats.collapsed_cycles == {"scc(a+2)": ["a", "b", "c"]}
+    # The metrics that need acyclicity are measured on the condensation.
+    assert stats.depth == 2
+    assert stats.width == 1
+    assert stats.critical_path is not None
+    assert stats.critical_path.nodes == ["scc(a+2)", "d"]
 
 
 def test_analyse_counts_groups_and_isolated_nodes():
@@ -201,3 +206,24 @@ def test_results_are_stable_across_runs():
     graph = graph_of(DIAMOND)
     first, second = analyse(graph), analyse(graph)
     assert first == second
+
+
+def test_witnesses_give_a_shortest_reason_for_every_reached_node():
+    from dagreach.analysis import witnesses
+
+    graph = graph_of("digraph { a -> b -> c -> d; a -> d }")
+    index = witnesses(graph, ["a"], "down")
+    assert index.distance["d"] == 1
+    assert index.path("d") == ["a", "d"]
+    assert index.path("c") == ["a", "b", "c"]
+    assert index.path("a") == ["a"]
+    assert index.path("missing") == []
+
+
+def test_witnesses_from_several_seeds_pick_the_nearest_one():
+    from dagreach.analysis import witnesses
+
+    graph = graph_of("digraph { far -> mid -> target; near -> target }")
+    index = witnesses(graph, ["far", "near"], "down")
+    assert index.path("target") == ["near", "target"]
+    assert index.distance["target"] == 1

@@ -88,8 +88,9 @@ def test_stats_reports_the_shape(capsys):
     assert main(["stats", str(FIXTURES / "terraform.dot")]) == EXIT_OK
     out = capsys.readouterr().out
     assert "5 nodes, 5 edges, acyclic" in out
-    assert "depth 4 level(s), width 2" in out
-    assert "critical path:" in out
+    assert "depth 4 level(s), width 2 (largest earliest-start generation)" in out
+    assert "longest path:" in out  # no durations here, so it is structural
+    assert "critical path" not in out
 
 
 def test_stats_json_carries_every_metric(capsys):
@@ -98,19 +99,24 @@ def test_stats_json_carries_every_metric(capsys):
     assert report["acyclic"] is True
     assert report["roots"] == ["extract_orders", "extract_customers"]
     assert report["leaves"] == ["notify"]
-    assert report["critical_path"]["weighted"] is True
-    assert report["critical_path"]["nodes"][0].startswith("extract_")
+    assert report["schema_version"] == 1
+    assert report["edge_semantics"] == "feeds"
+    assert report["longest_path"]["weighted"] is True
+    assert report["longest_path"]["measure"] == "duration"
+    assert report["longest_path"]["nodes"][0].startswith("extract_")
     assert report["articulation_points"] == ["transform_orders", "load_warehouse"]
 
 
-def test_stats_on_a_cyclic_graph_says_what_it_cannot_compute(tmp_path, capsys):
+def test_stats_on_a_cyclic_graph_collapses_and_says_so(tmp_path, capsys):
     cyclic = tmp_path / "cyclic.dot"
-    cyclic.write_text("digraph { a -> b -> c -> a }", encoding="utf-8")
+    cyclic.write_text("digraph { a -> b -> c -> a; c -> d }", encoding="utf-8")
     assert main(["stats", str(cyclic)]) == EXIT_OK
     out = capsys.readouterr().out
     assert "1 cycle(s)" in out
-    assert "not computed while cycles remain" in out
+    assert "cycles are collapsed before measuring" in out
     assert "cycle: a, b, c" in out
+    assert "measured on the condensed graph" in out
+    assert "scc(a+2)" in out
 
 
 def test_impact_reports_reach_cost_and_groups(capsys):
@@ -199,3 +205,55 @@ def test_output_stays_ascii_for_legacy_consoles(argv, capsys):
     captured = capsys.readouterr()
     assert captured.out.isascii(), captured.out
     assert captured.err.isascii(), captured.err
+
+
+def test_explain_shows_a_witness_path_per_reached_node(capsys):
+    assert (
+        main(
+            [
+                "impact",
+                str(FIXTURES / "pipeline.jgf.json"),
+                "--changed",
+                "extract_orders",
+                "--explain",
+            ]
+        )
+        == EXIT_OK
+    )
+    out = capsys.readouterr().out
+    assert "why (3 of 3 shown):" in out
+    assert "transform_orders (distance 1): extract_orders -> transform_orders" in out
+    assert (
+        "notify (distance 3): extract_orders -> transform_orders -> load_warehouse -> notify" in out
+    )
+
+
+def test_explain_is_absent_from_json_unless_asked(capsys):
+    assert (
+        main(
+            ["impact", str(FIXTURES / "pipeline.jgf.json"), "--changed", "extract_orders", "--json"]
+        )
+        == EXIT_OK
+    )
+    assert "explain" not in json.loads(capsys.readouterr().out)
+
+    assert (
+        main(
+            [
+                "impact",
+                str(FIXTURES / "pipeline.jgf.json"),
+                "--changed",
+                "extract_orders",
+                "--json",
+                "--explain",
+            ]
+        )
+        == EXIT_OK
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["explain"]["load_warehouse"]["distance"] == 2
+    assert report["explain"]["load_warehouse"]["path"] == [
+        "extract_orders",
+        "transform_orders",
+        "load_warehouse",
+    ]

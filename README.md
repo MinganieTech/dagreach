@@ -1,20 +1,49 @@
 # dagreach
 
-**Impact analysis for any DAG — what a change reaches, offline, in CI.**
+**Portable change-impact analysis for dependency graphs.**
+**See what a change can reach, why it reaches it, and whether CI should allow it.**
 
-`nx affected` and `bazel query rdeps` answer "what does this change touch?" — but only inside
-their own build graph. `dagreach` answers the same question for *any* directed acyclic graph you
-can hand it: a `terraform graph` dump, a dbt manifest, a build graph, a task plan, a dependency
-tree, anything that speaks DOT.
+`nx affected` and `bazel query rdeps` answer "what does this change touch?" — but only inside their
+own build graph. `dagreach` answers it for a graph produced by anything: a `terraform graph` dump,
+a dbt manifest, a pipeline export, a service map, an SBOM, a plan you generated yourself.
 
-No database, no daemon, no runtime dependency. A file in, an answer out.
+Give it a graph and what changed; get the affected surface, the reasons, and a CI decision. No
+database, no daemon, no runtime dependency — a file in, an answer out.
 
-> **Status: pre-alpha (0.0.1).** Reading and analysis work; the diff, the CI integration and the
-> HTML report do not exist yet.
+DOT carries structure, not meaning: which way an edge points is a convention, so dagreach makes you
+declare it (or warns you when it can tell you got it wrong). See
+[edge semantics](docs/metrics.md#edge-semantics).
+
+> **Status: pre-alpha (0.0.1).** Reading, analysis and policies work; the reach diff, the CI action
+> and the HTML report do not exist yet.
 
 ## What works today
 
-### `impact` — what a change reaches
+### `impact` — what a change reaches, why, and whether CI should allow it
+
+```console
+$ dagreach impact services.dot --changed auth --explain --fail-if-reaches group=production
+services.dot: auth reaches 3 of 3 nodes (100%)
+edges: source feeds target, so impact follows edges forward
+downstream (2): token, payments
+impacted leaves (1): payments
+groups touched: core 2, production 1
+why (2 of 2 shown):
+  token (distance 1): auth -> token
+  payments (distance 2): auth -> token -> payments
+policies:
+  FAIL fail-if-reaches group=production: 1 node(s) matching group=production are reached
+    payments: auth -> token -> payments
+$ echo $?
+1
+```
+
+Policies are four flags, not a language — `--fail-if-reaches`, `--max-impacted`, `--fail-on cycle`,
+and the reach diff to come. Each one reports its verdict, what matched, and the path that proves
+it; the exit code is `1` when a policy fails, and never when the input was simply unreadable. See
+[docs/policies.md](docs/policies.md).
+
+The full report, without policies:
 
 ```console
 $ dagreach impact pipeline.json --changed transform_orders
@@ -32,17 +61,28 @@ note: transform_orders is an articulation point: everything behind it depends on
 ### `stats` — the shape of the graph
 
 ```console
-$ terraform graph | dagreach stats -
+$ terraform graph | dagreach stats - --edge-semantics depends-on
 <stdin>: 42 nodes, 61 edges, acyclic
-shape: depth 7 level(s), width 12, 5 root(s), 9 leaf/leaves
-critical path: 6 edge(s), unweighted
-  aws_vpc.main -> aws_subnet.main -> aws_security_group.web -> ...
-articulation points (3): aws_vpc.main, aws_subnet.main, aws_iam_role.app
+edges: source depends on target, so impact follows edges backward
+shape: depth 7 level(s), width 12 (largest earliest-start generation), 5 root(s), 9 leaf/leaves
+longest path: 6 edge(s), structural (no durations declared)
+  aws_vpc.main -> aws_subnet.main -> aws_security_group.web (+3 more)
+articulation points (3, undirected reading): aws_vpc.main, aws_subnet.main, aws_iam_role.app
+```
+
+Forget the `--edge-semantics` on a file dagreach recognises and it says so rather than answering
+backwards:
+
+```text
+warnings (1):
+  - this file looks like terraform graph output, where an edge means 'source depends on target',
+    but it was read as 'feeds'; pass --edge-semantics depends-on if impact comes out backwards
 ```
 
 Width is the most work the dependencies ever allow to run at once; depth is the shortest schedule
-with unlimited parallelism. A cyclic graph is not an error: the cycles are listed, and the metrics
-that need acyclicity are reported as not computed rather than approximated. Every definition is in
+with unlimited parallelism. Without durations there is no "critical" path, only a longest one, and
+the output says so. A cyclic graph is not an error: the cycles are listed and collapsed before the
+metrics that need acyclicity are measured, and the report says it did that. Every definition is in
 [docs/metrics.md](docs/metrics.md).
 
 ### `parse` — does my export even load?
@@ -50,6 +90,7 @@ that need acyclicity are reported as not computed rather than approximated. Ever
 ```console
 $ dagreach parse pipeline.json
 pipeline.json: jgf 'etl_daily', directed, 5 nodes, 4 edges
+edges: source feeds target, so impact follows edges forward
 profile: durations on 4/5 nodes and 0/4 edges, 3 status value(s), 3 group(s)
 ```
 
@@ -78,12 +119,13 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T0 | Repository, license, CI, command skeleton | done |
 | T1 | DOT and JSON Graph Format readers, attribute profile, `parse` | done |
 | T2 | Analysis core: reachability, critical path, articulation points, width | done |
-| T3 | Structural diff and metric deltas, CI exit codes | next |
-| T4 | GitHub Action and pull-request comment | |
-| T5 | Self-contained HTML report | |
-| T6 | Docs, recipes (Terraform, dbt, Airflow), launch | |
+| T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
+| T4 | Reach diff between two graphs, `--fail-on-new-reach` | next |
+| T5 | Adapters: Terraform, dbt, a pipeline format, generic | |
+| T6 | GitHub Action and pull-request comment | |
+| T7 | Self-contained HTML report | |
 
-Structural linting is deliberately out of scope for 1.0.
+Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.
 
 ## Install
 
