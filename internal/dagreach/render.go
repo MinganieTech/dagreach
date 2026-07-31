@@ -151,10 +151,9 @@ func StatsText(g *Graph, stats *GraphStats, limit int, policies []*PolicyResult)
 		measured = " (measured on the condensed graph)"
 	}
 	lines = append(lines, fmt.Sprintf(
-		"shape%s: depth %s level(s), width %s (largest earliest-start generation), "+
+		"shape%s: depth %d level(s), width %d (largest earliest-start generation), "+
 			"%d root(s), %d leaf/leaves",
-		measured, optionalInt(stats.Depth), optionalInt(stats.Width),
-		len(stats.Roots), len(stats.Leaves)))
+		measured, stats.Depth, stats.Width, len(stats.Roots), len(stats.Leaves)))
 
 	if stats.LongestPath != nil && len(stats.LongestPath.Nodes) > 0 {
 		lines = append(lines,
@@ -404,11 +403,4 @@ func sourceName(g *Graph) string {
 		return "<input>"
 	}
 	return g.Source
-}
-
-func optionalInt(value *int) string {
-	if value == nil {
-		return "None"
-	}
-	return fmt.Sprintf("%d", *value)
 }

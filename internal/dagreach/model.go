@@ -1,7 +1,11 @@
 package dagreach
 
-// The graph model, ported from src/dagreach/model.py. Declaration order is part
-// of the contract, so nodes keep an explicit order alongside the lookup map.
+// The graph model every reader produces and every command consumes.
+//
+// Deliberately small: identifiers, attributes, and the order things were seen
+// in. Declaration order is part of the contract, so nodes keep an explicit
+// order alongside the lookup map. No adjacency index and no algorithms live
+// here - analysis builds its own structures on top.
 
 type Node struct {
 	ID    string

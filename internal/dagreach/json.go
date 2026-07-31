@@ -13,6 +13,7 @@ package dagreach
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -124,16 +125,17 @@ func decodeFrom(decoder *json.Decoder, token json.Token) (any, error) {
 	}
 }
 
-// pythonJSON serialises a value the way json.dumps(..., sort_keys=True) does,
-// so a container kept verbatim from a metadata block reads the same in both
-// implementations.
-func pythonJSON(value any) string {
+// renderValue serialises a container that is kept verbatim as an attribute
+// value - a list of owners, a nested object - so it can travel as text and be
+// selected on. Keys are sorted and separators spaced (", ", ": ") so the same
+// metadata always produces the same string.
+func renderValue(value any) string {
 	var built strings.Builder
-	writePythonJSON(&built, value)
+	writeValue(&built, value)
 	return built.String()
 }
 
-func writePythonJSON(built *strings.Builder, value any) {
+func writeValue(built *strings.Builder, value any) {
 	switch typed := value.(type) {
 	case nil:
 		built.WriteString("null")
@@ -154,13 +156,13 @@ func writePythonJSON(built *strings.Builder, value any) {
 			if index > 0 {
 				built.WriteString(", ")
 			}
-			writePythonJSON(built, item)
+			writeValue(built, item)
 		}
 		built.WriteString("]")
 	case *Object:
 		built.WriteString("{")
 		keys := append([]string{}, typed.Keys()...)
-		sortStrings(keys)
+		sort.Strings(keys)
 		for index, key := range keys {
 			if index > 0 {
 				built.WriteString(", ")
@@ -168,19 +170,20 @@ func writePythonJSON(built *strings.Builder, value any) {
 			encoded, _ := json.Marshal(key)
 			built.Write(encoded)
 			built.WriteString(": ")
-			writePythonJSON(built, typed.Value(key))
+			writeValue(built, typed.Value(key))
 		}
 		built.WriteString("}")
 	}
 }
 
-// pythonRepr renders a scalar the way Python's repr does, for warning messages.
-func pythonRepr(value any) string {
+// renderScalar quotes a value for a warning message: strings in quotes, numbers
+// bare, containers rendered by renderValue.
+func renderScalar(value any) string {
 	if text, ok := value.(string); ok {
 		return "'" + text + "'"
 	}
 	if number, ok := value.(json.Number); ok {
 		return number.String()
 	}
-	return pythonJSON(value)
+	return renderValue(value)
 }

@@ -22,6 +22,7 @@ package dagreach
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
 	"sort"
 )
 
@@ -62,10 +63,8 @@ func DiffReach(before, after *Graph, seeds []string) *ReachDiff {
 	beforeAdjacency := BuildAdjacency(before)
 	afterAdjacency := BuildAdjacency(after)
 
-	_, beforeIndex := reachFrom(before, seeds, beforeAdjacency)
-	reachedAfter, afterIndex := reachFrom(after, seeds, afterAdjacency)
 	reachedBefore, _ := reachFrom(before, seeds, beforeAdjacency)
-	_ = beforeIndex
+	reachedAfter, afterIndex := reachFrom(after, seeds, afterAdjacency)
 
 	beforeEdges := edgeSet(before)
 	afterEdges := edgeSet(after)
@@ -296,16 +295,7 @@ func DiffAllPairs(before, after *Graph) *AllPairsDelta {
 func bitCount(value *big.Int) int {
 	count := 0
 	for _, word := range value.Bits() {
-		count += popcount(uint(word))
-	}
-	return count
-}
-
-func popcount(word uint) int {
-	count := 0
-	for word != 0 {
-		word &= word - 1
-		count++
+		count += bits.OnesCount(uint(word))
 	}
 	return count
 }

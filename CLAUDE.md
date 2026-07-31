@@ -30,9 +30,9 @@ The metrics exist to support that decision; they are not the product.
   place, and the reason gets written down here first.
 - **Printed text is ASCII.** A Windows console on a legacy code page renders anything else as `?`.
   Docstrings and documentation are free; CLI output is not, and a test enforces it.
-- **Exit codes are a public contract** (`0` ok, `1` a policy failed, `2` usage error, `3` not
-  implemented, `4` the input could not be read). CI pipelines depend on them; changing one is a
-  breaking change. A broken selector or a missing file must never exit `1`: an unusable input must
+- **Exit codes are a public contract** (`0` ok, `1` a policy failed, `2` usage error, `4` the input
+  could not be read; `3` is retired). CI pipelines depend on them; changing one is a breaking
+  change. A broken selector or a missing file must never exit `1`: an unusable input must
   not be indistinguishable from a clean gate.
 - **A profile states what it decided.** An identifier it rewrote keeps the original as an
   attribute, a fallback it took is a warning, and detection itself is announced. `load` returns the

@@ -150,8 +150,8 @@ func TestAnalyseReportsTheShapeOfAGraph(t *testing.T) {
 	if stats.Nodes != 4 || stats.Edges != 4 || !stats.Acyclic() {
 		t.Fatalf("nodes=%d edges=%d acyclic=%v", stats.Nodes, stats.Edges, stats.Acyclic())
 	}
-	if *stats.Depth != 3 || *stats.Width != 2 {
-		t.Errorf("depth=%d width=%d", *stats.Depth, *stats.Width)
+	if stats.Depth != 3 || stats.Width != 2 {
+		t.Errorf("depth=%d width=%d", stats.Depth, stats.Width)
 	}
 	assertEqual(t, stats.WidestLevel, []string{"b", "c"}, "widest generation")
 	assertEqual(t, stats.Roots, []string{"a"}, "roots")
@@ -166,8 +166,8 @@ func TestAnalyseCondensesCyclesRatherThanGivingUp(t *testing.T) {
 	}
 	assertEqual(t, stats.Cycles[0], []string{"a", "b", "c"}, "cycle")
 	assertEqual(t, stats.CollapsedCycles["scc(a+2)"], []string{"a", "b", "c"}, "collapsed")
-	if *stats.Depth != 2 || *stats.Width != 1 {
-		t.Errorf("depth=%d width=%d, expected the condensation", *stats.Depth, *stats.Width)
+	if stats.Depth != 2 || stats.Width != 1 {
+		t.Errorf("depth=%d width=%d, expected the condensation", stats.Depth, stats.Width)
 	}
 	assertEqual(t, stats.LongestPath.Nodes, []string{"scc(a+2)", "d"}, "path over the condensation")
 }
@@ -236,8 +236,8 @@ func TestDeepGraphsDoNotOverflowTheStack(t *testing.T) {
 	built.WriteString(" }")
 
 	stats := Analyse(mustParseDOT(t, built.String()))
-	if stats.Nodes != 10001 || *stats.Depth != 10001 || *stats.Width != 1 {
-		t.Fatalf("nodes=%d depth=%d width=%d", stats.Nodes, *stats.Depth, *stats.Width)
+	if stats.Nodes != 10001 || stats.Depth != 10001 || stats.Width != 1 {
+		t.Fatalf("nodes=%d depth=%d width=%d", stats.Nodes, stats.Depth, stats.Width)
 	}
 	if stats.LongestPath.Edges() != 10000 {
 		t.Errorf("path edges = %d", stats.LongestPath.Edges())

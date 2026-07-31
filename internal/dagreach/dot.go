@@ -1,8 +1,15 @@
 package dagreach
 
-// The DOT reader, ported from src/dagreach/readers/dot.py. Same grammar, same
-// error locations, same warnings - the point of the spike is that the JSON
-// reports come out identical.
+// A reader for the Graphviz DOT language.
+//
+// Hand-written rather than delegated to a library for two reasons: dagreach
+// ships with no dependencies, and error messages must point at a line and a
+// column, which is what makes a malformed export debuggable.
+//
+// The grammar implemented is the one published at
+// https://graphviz.org/doc/info/lang.html. Layout attributes are kept verbatim
+// as node/edge attributes; ports and compass points are parsed and dropped,
+// since they address a drawing, not a dependency.
 
 import (
 	"fmt"

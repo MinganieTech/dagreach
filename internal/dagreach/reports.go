@@ -1,7 +1,7 @@
 package dagreach
 
 // The two analyses a command reports on: the shape of a graph, and what a
-// change reaches in it. Ported from the same functions in analysis.py.
+// change reaches in it.
 
 import "math"
 
@@ -13,8 +13,8 @@ type GraphStats struct {
 	Leaves             []string
 	Isolated           []string
 	Cycles             [][]string
-	Depth              *int
-	Width              *int
+	Depth              int
+	Width              int
 	WidestLevel        []string
 	ArticulationPoints []string
 	LongestPath        *CriticalPath
@@ -60,20 +60,15 @@ func Analyse(g *Graph) *GraphStats {
 		}
 	}
 
+	// The condensation is acyclic by construction, so both are always measurable.
 	widest := []string{}
-	var depth, width *int
-	if acyclicWork {
-		for _, level := range levels {
-			if len(level) > len(widest) {
-				widest = level
-			}
+	for _, level := range levels {
+		if len(level) > len(widest) {
+			widest = level
 		}
-		count := len(levels)
-		depth = &count
-		if count > 0 {
-			size := len(widest)
-			width = &size
-		}
+	}
+	if !acyclicWork {
+		panic("the condensation of a graph cannot hold a cycle")
 	}
 
 	groups := NewCounter()
@@ -92,8 +87,8 @@ func Analyse(g *Graph) *GraphStats {
 		Leaves:             leaves,
 		Isolated:           isolated,
 		Cycles:             cycles,
-		Depth:              depth,
-		Width:              width,
+		Depth:              len(levels),
+		Width:              len(widest),
 		WidestLevel:        widest,
 		ArticulationPoints: ArticulationPoints(g, adjacency),
 		LongestPath:        path,
