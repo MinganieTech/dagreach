@@ -1,0 +1,18 @@
+// Modeled on the output of `terraform graph` (Terraform 1.x).
+// Not a captured run: the shape is faithful, the resources are invented.
+digraph {
+	compound = "true"
+	newrank = "true"
+	subgraph "root" {
+		"[root] aws_instance.web (expand)" [label = "aws_instance.web", shape = "box"]
+		"[root] aws_security_group.web (expand)" [label = "aws_security_group.web", shape = "box"]
+		"[root] aws_subnet.main (expand)" [label = "aws_subnet.main", shape = "box"]
+		"[root] aws_vpc.main (expand)" [label = "aws_vpc.main", shape = "box"]
+		"[root] provider[\"registry.terraform.io/hashicorp/aws\"]" [label = "provider[\"registry.terraform.io/hashicorp/aws\"]", shape = "diamond"]
+		"[root] aws_instance.web (expand)" -> "[root] aws_security_group.web (expand)"
+		"[root] aws_instance.web (expand)" -> "[root] aws_subnet.main (expand)"
+		"[root] aws_security_group.web (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] aws_subnet.main (expand)" -> "[root] aws_vpc.main (expand)"
+		"[root] aws_vpc.main (expand)" -> "[root] provider[\"registry.terraform.io/hashicorp/aws\"]"
+	}
+}

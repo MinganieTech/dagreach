@@ -1,4 +1,5 @@
-dagreach
-dagreach.exe
-dist/
+# the built binary, anchored so it cannot swallow cmd/dagreach or internal/dagreach
+/dagreach
+/dagreach.exe
+/dist/
 *.test
