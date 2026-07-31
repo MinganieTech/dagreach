@@ -14,10 +14,10 @@ Every policy states its verdict, what matched, and the **path that proves it**. 
 | `0` | ran, and every policy passed |
 | `1` | ran, and at least one policy failed |
 | `2` | the command line was wrong (unknown flag, unreadable selector) |
-| `3` | the command exists but is not implemented yet |
 | `4` | the input could not be read (missing file, syntax error, unknown node) |
 
 These are a public contract: a pipeline depends on them, so changing one is a breaking change.
+(`3` once meant "declared but not implemented"; nothing is, so it is retired rather than reused.)
 Note that `2` and `4` are *not* policy failures — a broken selector must never look like a clean
 gate, and a missing file must never look like an approval.
 

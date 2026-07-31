@@ -1,7 +1,16 @@
 package dagreach
 
-// The analysis core, ported from src/dagreach/analysis.py and profile.py.
-// Same traversal order, same tie-breaking, same condensation naming.
+// The analysis core.
+//
+// Every metric here is defined in docs/metrics.md and computed in pure Go: the
+// algorithms needed - traversal, topological order, strongly connected
+// components, longest path, articulation points - are a few dozen lines each,
+// and a graph library would only start to pay for itself on the heavier
+// mathematics dagreach deliberately does not promise yet.
+//
+// Determinism is a property of the output, not an accident: every traversal
+// walks nodes in the order the source declared them, so two runs on the same
+// file produce the same lists.
 
 import (
 	"fmt"

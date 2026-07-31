@@ -40,8 +40,8 @@ func StatsJSON(g *Graph, stats *GraphStats, policies []*PolicyResult) map[string
 		"cycles":              stats.Cycles,
 		"condensed":           stats.Condensed,
 		"collapsed_cycles":    stats.CollapsedCycles,
-		"depth":               optionalIntValue(stats.Depth),
-		"width":               optionalIntValue(stats.Width),
+		"depth":               stats.Depth,
+		"width":               stats.Width,
 		"widest_generation":   stats.WidestLevel,
 		"roots":               stats.Roots,
 		"leaves":              stats.Leaves,
@@ -50,12 +50,8 @@ func StatsJSON(g *Graph, stats *GraphStats, policies []*PolicyResult) map[string
 		"longest_path":        criticalPathJSON(stats.LongestPath),
 		"groups":              stats.Groups.Map(),
 		"policies":            policiesJSON(policies),
-		"warnings":            stats.warnings(g),
+		"warnings":            append([]string{}, g.Warnings...),
 	}
-}
-
-func (s *GraphStats) warnings(g *Graph) []string {
-	return append([]string{}, g.Warnings...)
 }
 
 // ImpactJSON is the machine-readable form of `dagreach impact`.
@@ -200,13 +196,6 @@ func optionalString(value string) any {
 		return nil
 	}
 	return value
-}
-
-func optionalIntValue(value *int) any {
-	if value == nil {
-		return nil
-	}
-	return *value
 }
 
 func optionalFloat(value *float64) any {

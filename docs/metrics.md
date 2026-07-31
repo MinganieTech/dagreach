@@ -39,7 +39,8 @@ one, and it is O(nodes + edges); the exact maximum antichain requires bipartite 
 not computed.
 
 When the graph has cycles, both are measured on the **condensation**: each cycle is collapsed into
-one node named `scc(first-member+N)`, and the report says it was measured that way. Refusing to
+one node named `scc(first-member+N)`, and the report says it was measured that way. Since the
+condensation is acyclic by construction, depth and width are always reported - never null. Refusing to
 answer would be a caprice — the shape of the rest of the graph is still a fact — but pretending the
 cycle is a straight line would be a lie.
 

@@ -11,7 +11,6 @@ package dagreach
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 )
 
 // ParseJGF parses JSON Graph Format text into a Graph.
@@ -50,7 +49,7 @@ func ParseJGF(text, source string) (*Graph, error) {
 			graph.Directed = value
 		} else {
 			graph.Warn(fmt.Sprintf(
-				"'directed' is not a boolean (%s); assuming a directed graph", pythonRepr(raw)))
+				"'directed' is not a boolean (%s); assuming a directed graph", renderScalar(raw)))
 		}
 	}
 	if !graph.Directed {
@@ -308,7 +307,7 @@ func flatten(metadata any, graph *Graph, what string) *attrList {
 		if text, ok := asText(value); ok {
 			flattened.set(key, text)
 		} else {
-			flattened.set(key, pythonJSON(value))
+			flattened.set(key, renderValue(value))
 		}
 	}
 	return flattened
@@ -336,7 +335,7 @@ func asString(value any) string {
 	if text, ok := asText(value); ok {
 		return text
 	}
-	return pythonJSON(value)
+	return renderValue(value)
 }
 
 func jsonTypeName(value any) string {
@@ -356,5 +355,3 @@ func jsonTypeName(value any) string {
 	}
 	return "object"
 }
-
-func sortStrings(values []string) { sort.Strings(values) }

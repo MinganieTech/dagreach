@@ -379,3 +379,19 @@ func TestOutputStaysASCIIForLegacyConsoles(t *testing.T) {
 		}
 	}
 }
+
+func TestDegenerateGraphsStillGetAnAnswer(t *testing.T) {
+	empty := write(t, "empty.dot", "digraph { }")
+	code, out, _ := runCLI("stats", empty)
+	if code != ExitOK || !strings.Contains(out, "0 nodes, 0 edges, acyclic") ||
+		!strings.Contains(out, "depth 0 level(s), width 0") {
+		t.Errorf("an empty graph should answer plainly: code=%d out=%q", code, out)
+	}
+
+	loop := write(t, "loop.dot", "digraph { a -> a }")
+	code, out, _ = runCLI("stats", loop)
+	if code != ExitOK || !strings.Contains(out, "1 cycle(s)") ||
+		!strings.Contains(out, "measured on the condensed graph") {
+		t.Errorf("a self-loop is a cycle: code=%d out=%q", code, out)
+	}
+}
