@@ -87,35 +87,76 @@ In JSON, the same thing, under `policies`:
 }
 ```
 
-## Planned: `--fail-on-new-reach` (slice T4)
+## `--fail-on-new-reach`: the policy that compares two versions
 
-The next policy compares two graphs rather than judging one, and it is the one that catches what a
+The other policies judge one graph. This one compares two, and it is the one that catches what a
 review misses — an edge that looks harmless but opens a route that did not exist:
 
 ```bash
-dagreach diff before.dot after.dot --changed auth-service --fail-on-new-reach group=production
+dagreach diff before.dot after.dot --changed auth --explain --fail-on-new-reach group=production
 ```
-
-**The definition it will implement**, fixed here so it cannot drift: *fail when a node matching the
-selector in `after` is reachable from the changed set in `after`, but was not reachable from it in
-`before`.*
-
-Stated that way it also catches the case with no new edge at all — a node that was already
-reachable and has just been **reclassified** into `group=production`. The report will separate the
-cause from the consequence:
 
 ```text
-FAIL: auth-service now reaches payments-db
-reason: new edge auth-service -> token-service
-path: auth-service -> token-service -> payments-db
-target matched: group=production
+before.dot -> after.dot: auth reaches 3 nodes, was 2 (+1, -0)
+edges: source feeds target, so impact follows edges forward
+new reach (1): payments
+structure: 0 node(s) added, 0 removed, 1 edge(s) added, 0 removed
+why (1 of 1 shown):
+  payments is now reached
+    reason: new edge token -> payments
+    path:   auth -> token -> payments
+policies:
+  FAIL fail-on-new-reach group=production: 1 target(s) matching group=production became reachable
+    payments: auth -> token -> payments
 ```
 
-The computation is two multi-source traversals, one per graph, `added = R_after - R_before` — no
-transitive closure is materialised.
+### The definition it implements
 
-A separate, explicitly requested `--all-pairs-reachability-delta` will answer the global question
-("which pairs became reachable anywhere in the graph"). Its help text will state that the **result
-itself** can hold Θ(V²) pairs, that it is not meant for ordinary CI, that it aggregates by default,
-and it will offer `--count-only` and a limit. The cost is in the size of the answer, not in a
-promise about the algorithm.
+**A target is newly exposed when it matches the selector and is reached in `after`, while it did
+not both match and get reached in `before`.**
+
+The predicate is on the *pair* — matching and reached — not on reachability alone. That is
+deliberately one step broader than "reachable now, unreachable before", and it is what catches the
+target that was always reachable and has simply been **reclassified** into `group=production`. No
+new edge is required for a policy to fail, and the report always says which of the two happened:
+
+| Reason | What it means |
+|---|---|
+| `new-node` | the target did not exist in `before` |
+| `new-edge` | an edge on the witness path did not exist in `before`; the edge is named |
+| `reclassified` | already reachable, and the selector attribute changed; both values are named |
+| `newly-reachable` | defensive last resort, not expected to occur |
+
+### The cost
+
+Two multi-source traversals, one per graph, then set differences:
+
+```text
+R_before = reachable(before, changed)
+R_after  = reachable(after, changed)
+added    = R_after - R_before
+removed  = R_before - R_after
+```
+
+No transitive closure is materialised. Measured on 20 000 nodes and 100 000 edges: **0.3 s**.
+
+## `--all-pairs-reachability-delta`: opt in, and know what you are asking
+
+```bash
+dagreach diff before.dot after.dot --all-pairs-reachability-delta [--count-only] [--limit N]
+```
+
+This answers the global question — which ordered pairs became reachable anywhere in the graph —
+and it is a separate flag for one reason: **the answer itself can hold one entry per pair of
+nodes**, so on any real graph it is a result nobody reads. That is a property of the question, not
+a promise about the algorithm; dagreach computes it with bitsets over the condensation, and
+measured 2.6 s on the same 20 000-node graph.
+
+Consequently:
+
+- it is **not meant for ordinary CI**;
+- the result is **aggregated by source** by default, largest first;
+- `--count-only` reports the totals alone;
+- `--limit` shortens the ranking, and says how many sources it hid.
+
+It never fails a build on its own: no policy is attached to it.

@@ -15,9 +15,17 @@ from collections.abc import Sequence
 
 from dagreach import __version__, render
 from dagreach.analysis import analyse, impact
+from dagreach.diff import all_pairs_delta, newly_exposed, reach_diff
 from dagreach.errors import DagreachError
 from dagreach.model import Graph
-from dagreach.policy import PolicyResult, any_failed, fail_if_reaches, fail_on_cycle, max_impacted
+from dagreach.policy import (
+    PolicyResult,
+    any_failed,
+    fail_if_reaches,
+    fail_on_cycle,
+    fail_on_new_reach,
+    max_impacted,
+)
 from dagreach.profile import summarize
 from dagreach.readers import FORMATS, read
 from dagreach.selectors import SELECTOR_KEYS, parse_selector
@@ -37,9 +45,7 @@ EXIT_INPUT_ERROR = 4
 
 DEFAULT_LIMIT = 10
 
-_PLANNED = {
-    "diff": "reach delta between two graphs, and --fail-on-new-reach (slice T4)",
-}
+_PLANNED: dict[str, str] = {}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -125,6 +131,63 @@ def build_parser() -> argparse.ArgumentParser:
         help="exit 1 when the condition holds",
     )
 
+    diff_command = subparsers.add_parser(
+        "diff",
+        help="what a change reaches now that it did not reach before",
+        description=(
+            "Compare two versions of a graph from the point of view of a change: what it "
+            "reaches now, what it stopped reaching, why, and whether CI should allow it."
+        ),
+    )
+    diff_command.add_argument("before", metavar="BEFORE", help="the graph as it was")
+    diff_command.add_argument("after", metavar="AFTER", help="the graph as it is now")
+    diff_command.add_argument(
+        "--format", choices=FORMATS, help="read both files as this format instead of detecting it"
+    )
+    diff_command.add_argument(
+        "--edge-semantics",
+        choices=EDGE_SEMANTICS,
+        help=f"what an edge means in both files (default {DEFAULT_SEMANTICS})",
+    )
+    diff_command.add_argument("--json", action="store_true", help="emit a JSON report on stdout")
+    _add_listing_arguments(diff_command)
+    diff_command.add_argument(
+        "--changed",
+        metavar="ID[,ID...]",
+        action="append",
+        default=[],
+        help="node that changed; repeat the flag or separate ids with commas",
+    )
+    diff_command.add_argument(
+        "--explain",
+        action="store_true",
+        help="show why each target became reachable, with the path that proves it",
+    )
+    diff_command.add_argument(
+        "--fail-on-new-reach",
+        metavar="SELECTOR",
+        action="append",
+        default=[],
+        help=(
+            "exit 1 when a matching target is reached in AFTER but was not reached in BEFORE "
+            "(a target reclassified into the selector counts too)"
+        ),
+    )
+    diff_command.add_argument(
+        "--all-pairs-reachability-delta",
+        action="store_true",
+        help=(
+            "also compare reachability over every ordered pair of nodes. Potentially quadratic: "
+            "the ANSWER can hold one entry per pair, so this is not meant for ordinary CI. "
+            "Aggregated by source; add --count-only for totals alone and --limit to shorten"
+        ),
+    )
+    diff_command.add_argument(
+        "--count-only",
+        action="store_true",
+        help="with --all-pairs-reachability-delta, report totals without the per-source ranking",
+    )
+
     for name, help_text in _PLANNED.items():
         subparsers.add_parser(name, help=f"[not implemented] {help_text}")
     return parser
@@ -182,6 +245,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "stats":
             return _run_stats(graph, args)
         return _run_impact(graph, args)
+
+    if args.command == "diff":
+        return _run_diff(args)
 
     print(
         f"dagreach {__version__}: '{args.command}' is not implemented yet "
@@ -245,6 +311,75 @@ def _run_impact(graph: Graph, args: argparse.Namespace) -> int:
         render.impact_text(graph, report, args.limit, policies, explain=args.explain),
     )
     return EXIT_POLICY_FAILED if any_failed(policies) else EXIT_OK
+
+
+def _run_diff(args: argparse.Namespace) -> int:
+    try:
+        before = _load(args.before, args)
+        after = _load(args.after, args)
+    except DagreachError as exc:
+        print(f"dagreach: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+
+    requested = _split_ids(args.changed)
+    if not requested and not args.all_pairs_reachability_delta:
+        print(
+            "dagreach: diff needs --changed, or --all-pairs-reachability-delta for the "
+            "global comparison",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    unknown = [node for node in requested if not before.has_node(node) and not after.has_node(node)]
+    if unknown:
+        for node in unknown:
+            print(
+                f"dagreach: no node {node!r} in either graph{_suggest(node, after)}",
+                file=sys.stderr,
+            )
+        return EXIT_INPUT_ERROR
+
+    try:
+        selectors = [parse_selector(text) for text in args.fail_on_new_reach]
+    except DagreachError as exc:
+        print(f"dagreach: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    diff = reach_diff(before, after, requested)
+    exposures = [
+        exposure
+        for selector in selectors
+        for exposure in newly_exposed(before, after, diff, selector)
+    ]
+    policies = [
+        fail_on_new_reach(newly_exposed(before, after, diff, selector), selector)
+        for selector in selectors
+    ]
+    delta = all_pairs_delta(before, after) if args.all_pairs_reachability_delta else None
+
+    _emit(
+        args.json,
+        render.diff_json(before, after, diff, exposures, policies, all_pairs=delta),
+        render.diff_text(
+            before,
+            after,
+            diff,
+            exposures,
+            policies,
+            args.limit,
+            explain=args.explain,
+            all_pairs=delta,
+            count_only=args.count_only,
+        ),
+    )
+    return EXIT_POLICY_FAILED if any_failed(policies) else EXIT_OK
+
+
+def _load(path: str, args: argparse.Namespace) -> Graph:
+    graph = read(path, format=args.format)
+    graph = orient(graph, args.edge_semantics or DEFAULT_SEMANTICS)
+    warn_if_orientation_is_suspect(graph, args.edge_semantics)
+    return graph
 
 
 def _emit(as_json: bool, document: dict, lines: list[str]) -> None:

@@ -96,3 +96,27 @@ def _witnesses_for(nodes: list[str], index: WitnessIndex) -> dict[str, list[str]
 
 def any_failed(results: list[PolicyResult]) -> bool:
     return any(result.failed for result in results)
+
+
+def fail_on_new_reach(exposures: list, selector: Selector) -> PolicyResult:
+    """Fail when the change reaches a matching target it did not reach before.
+
+    "Did not reach before" is judged on the pair (matches the selector, is
+    reached), so a target that was always reachable and has just been
+    reclassified counts too. See dagreach.diff.newly_exposed.
+    """
+    if not exposures:
+        return PolicyResult(
+            "fail-on-new-reach",
+            str(selector),
+            False,
+            f"nothing matching {selector} became reachable",
+        )
+    return PolicyResult(
+        "fail-on-new-reach",
+        str(selector),
+        True,
+        f"{len(exposures)} target(s) matching {selector} became reachable",
+        [exposure.target for exposure in exposures],
+        {exposure.target: exposure.path for exposure in exposures if exposure.path},
+    )

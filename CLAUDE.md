@@ -42,4 +42,7 @@ The metrics exist to support that decision; they are not the product.
 - The version lives in `src/dagreach/__init__.py` and nowhere else.
 - Metric definitions must be documented and defensible. State the assumption in the output when one
   is made — e.g. an unweighted critical path is measured in edges, and must say so.
+- **Measure before claiming a cost, and measure on a big graph.** Complexity reasoning misses what
+  a profiler finds: the first reach diff rebuilt a set difference inside a per-node comprehension
+  and took 23 s where it now takes 0.3 s. Every performance claim in the docs is a measurement.
 - Every slice keeps `ruff check`, `ruff format --check` and `pytest` green on Linux and Windows.
