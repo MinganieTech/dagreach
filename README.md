@@ -15,7 +15,8 @@ that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — 
 than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
 > **Status: pre-alpha (0.0.1).** Reading, analysis, policies, the reach diff and the first profiles
-> work; the CI action and the HTML report do not exist yet.
+> work; the CI action and the HTML report do not exist yet. Written in Go and shipped as a single
+> static binary: nothing to install alongside it.
 
 ## What works today
 
@@ -149,15 +150,19 @@ Dominators, structural linting and an HTML explorer are deliberately out of scop
 
 ## Install
 
+Download the binary for your platform and put it on your PATH. One file, no runtime, no
+dependencies. From source:
+
 ```bash
-pipx install dagreach     # or: uvx dagreach
+go install github.com/MinganieTech/dagreach/cmd/dagreach@latest
 ```
 
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-ruff check . && pytest
+go test ./...
+go vet ./... && gofmt -l .
+go build ./cmd/dagreach
 ```
 
 ## License
