@@ -16,9 +16,8 @@ def test_no_command_prints_help(capsys):
     assert "dagreach" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("command", ["stats", "impact", "diff"])
-def test_planned_commands_are_declared_but_not_implemented(command, capsys):
-    assert main([command]) == EXIT_NOT_IMPLEMENTED
+def test_diff_is_declared_but_not_implemented(capsys):
+    assert main(["diff"]) == EXIT_NOT_IMPLEMENTED
     assert "not implemented" in capsys.readouterr().err
 
 
@@ -83,3 +82,120 @@ def test_parse_accepts_an_explicit_format(tmp_path, capsys):
     misnamed.write_text('{"graph": {"nodes": [{"id": "a"}]}}', encoding="utf-8")
     assert main(["parse", str(misnamed), "--format", "jgf"]) == EXIT_OK
     assert "1 nodes" in capsys.readouterr().out
+
+
+def test_stats_reports_the_shape(capsys):
+    assert main(["stats", str(FIXTURES / "terraform.dot")]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "5 nodes, 5 edges, acyclic" in out
+    assert "depth 4 level(s), width 2" in out
+    assert "critical path:" in out
+
+
+def test_stats_json_carries_every_metric(capsys):
+    assert main(["stats", str(FIXTURES / "pipeline.jgf.json"), "--json"]) == EXIT_OK
+    report = json.loads(capsys.readouterr().out)
+    assert report["acyclic"] is True
+    assert report["roots"] == ["extract_orders", "extract_customers"]
+    assert report["leaves"] == ["notify"]
+    assert report["critical_path"]["weighted"] is True
+    assert report["critical_path"]["nodes"][0].startswith("extract_")
+    assert report["articulation_points"] == ["transform_orders", "load_warehouse"]
+
+
+def test_stats_on_a_cyclic_graph_says_what_it_cannot_compute(tmp_path, capsys):
+    cyclic = tmp_path / "cyclic.dot"
+    cyclic.write_text("digraph { a -> b -> c -> a }", encoding="utf-8")
+    assert main(["stats", str(cyclic)]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "1 cycle(s)" in out
+    assert "not computed while cycles remain" in out
+    assert "cycle: a, b, c" in out
+
+
+def test_impact_reports_reach_cost_and_groups(capsys):
+    assert (
+        main(["impact", str(FIXTURES / "pipeline.jgf.json"), "--changed", "transform_orders"])
+        == EXIT_OK
+    )
+    out = capsys.readouterr().out
+    assert "reaches 3 of 5 nodes (60%)" in out
+    assert "downstream (2): load_warehouse, notify" in out
+    assert "upstream (2)" in out
+    assert "cost of the impacted set: 480 of declared duration" in out
+    assert "groups touched: transform 1, load 2" in out
+    assert "articulation point" in out
+
+
+def test_impact_accepts_repeated_and_comma_separated_ids(capsys):
+    assert (
+        main(
+            [
+                "impact",
+                str(FIXTURES / "pipeline.jgf.json"),
+                "--changed",
+                "extract_orders,extract_customers",
+                "--changed",
+                "extract_orders",
+                "--json",
+            ]
+        )
+        == EXIT_OK
+    )
+    report = json.loads(capsys.readouterr().out)
+    assert report["changed"] == ["extract_orders", "extract_customers"]
+    assert report["impacted_count"] == 5
+
+
+def test_impact_on_an_unknown_node_suggests_a_close_one(capsys):
+    assert (
+        main(["impact", str(FIXTURES / "pipeline.jgf.json"), "--changed", "extract_order"])
+        == EXIT_INPUT_ERROR
+    )
+    err = capsys.readouterr().err
+    assert "no node 'extract_order'" in err
+    assert "did you mean 'extract_orders'" in err
+
+
+def test_lists_are_truncated_in_text_mode_but_say_so(tmp_path, capsys):
+    wide = tmp_path / "wide.dot"
+    edges = " ".join(f"root -> leaf{index};" for index in range(25))
+    wide.write_text("digraph { " + edges + " }", encoding="utf-8")
+    assert main(["impact", str(wide), "--changed", "root", "--limit", "5"]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "(+20 more)" in out
+
+
+def test_limit_zero_shows_everything(tmp_path, capsys):
+    wide = tmp_path / "wide.dot"
+    edges = " ".join(f"root -> leaf{index};" for index in range(25))
+    wide.write_text("digraph { " + edges + " }", encoding="utf-8")
+    assert main(["impact", str(wide), "--changed", "root", "--limit", "0"]) == EXIT_OK
+    out = capsys.readouterr().out
+    assert "more)" not in out
+    assert "leaf24" in out
+
+
+def test_json_report_is_never_truncated(tmp_path, capsys):
+    wide = tmp_path / "wide.dot"
+    edges = " ".join(f"root -> leaf{index};" for index in range(25))
+    wide.write_text("digraph { " + edges + " }", encoding="utf-8")
+    assert main(["impact", str(wide), "--changed", "root", "--limit", "5", "--json"]) == EXIT_OK
+    report = json.loads(capsys.readouterr().out)
+    assert len(report["downstream"]) == 25
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["parse", str(FIXTURES / "messy.dot")],
+        ["stats", str(FIXTURES / "pipeline.jgf.json")],
+        ["impact", str(FIXTURES / "pipeline.jgf.json"), "--changed", "transform_orders"],
+    ],
+)
+def test_output_stays_ascii_for_legacy_consoles(argv, capsys):
+    # A Windows console on a legacy code page turns anything else into '?'.
+    assert main(argv) == EXIT_OK
+    captured = capsys.readouterr()
+    assert captured.out.isascii(), captured.out
+    assert captured.err.isascii(), captured.err
