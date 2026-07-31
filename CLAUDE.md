@@ -20,11 +20,14 @@ The metrics exist to support that decision; they are not the product.
 
 ## Engineering rules
 
-- **Runtime dependencies are a deliberate decision, not a reflex.** There are none, and the
-  analysis core did not need the graph library that was planned for it: traversal, topological
-  order, strongly connected components, longest path and articulation points are a few dozen lines
-  each. A dependency becomes justified when the mathematics does — exact maximum antichains
-  (bipartite matching), spectral bottlenecks — and that decision gets written down here first.
+- **Go, standard library only.** The tool ships as a single static binary because the promise is
+  "a file in, an answer out, no runtime" - and a Python runtime contradicted it. The port kept
+  behaviour identical, verified by running both implementations over the same corpus and diffing
+  their JSON and text output (43/43 identical) before the Python source was removed; that harness
+  is the pattern to reuse for any rewrite.
+- **Dependencies are a deliberate decision, not a reflex.** There are none. In Go they would be
+  invisible to users, which makes the bar *lower*, not zero: a dependency still has to earn its
+  place, and the reason gets written down here first.
 - **Printed text is ASCII.** A Windows console on a legacy code page renders anything else as `?`.
   Docstrings and documentation are free; CLI output is not, and a test enforces it.
 - **Exit codes are a public contract** (`0` ok, `1` a policy failed, `2` usage error, `3` not
@@ -42,10 +45,13 @@ The metrics exist to support that decision; they are not the product.
 - **A recoverable oddity is a warning, never a failure and never a silence.** Readers record what
   they had to work around and the commands surface it. Anything accepted beyond a specification
   says so in the warning.
-- The version lives in `src/dagreach/__init__.py` and nowhere else.
+- The version lives in `internal/dagreach/cli.go` (`Version`) and nowhere else.
 - Metric definitions must be documented and defensible. State the assumption in the output when one
   is made — e.g. an unweighted critical path is measured in edges, and must say so.
 - **Measure before claiming a cost, and measure on a big graph.** Complexity reasoning misses what
-  a profiler finds: the first reach diff rebuilt a set difference inside a per-node comprehension
-  and took 23 s where it now takes 0.3 s. Every performance claim in the docs is a measurement.
-- Every slice keeps `ruff check`, `ruff format --check` and `pytest` green on Linux and Windows.
+  a profiler finds: a reach diff once rebuilt a set difference inside a per-node loop and took
+  23 s where it now takes milliseconds, and the Go port shipped an insertion sort that made the
+  analysis 25x slower than the code it replaced. Both were found by one large-graph run. Every
+  performance claim in the docs is a measurement.
+- Every slice keeps `gofmt -l .` empty and `go vet ./...` and `go test ./...` green on Linux,
+  Windows and macOS.
