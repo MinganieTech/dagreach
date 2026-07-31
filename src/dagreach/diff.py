@@ -26,10 +26,12 @@ from dagreach.analysis import Adjacency, WitnessIndex, build_adjacency, witnesse
 from dagreach.model import Graph
 from dagreach.selectors import Selector
 
-#: Why a node is newly reached, most specific cause first. `newly-reachable` is a
-#: defensive last resort: a path made only of pre-existing edges, from a seed that
-#: existed, cannot open a new route, so it is not expected to appear.
-REASONS = ("new-node", "new-edge", "reclassified", "newly-reachable")
+#: Why a target is newly exposed. The three cases are exhaustive: a target that is
+#: reached now and was not exposed before either did not exist, or was reached over
+#: an edge that did not exist, or was already reachable and changed classification.
+#: A path made only of pre-existing edges, from a seed that already existed, cannot
+#: open a route.
+REASONS = ("new-node", "new-edge", "reclassified")
 
 
 @dataclass(slots=True)
@@ -141,19 +143,15 @@ def newly_exposed(
         if target not in reached_after or target in exposed_before:
             continue
         path = diff.witnesses_after.path(target)
-        exposures.append(
-            _explain(before, after, target, path, before_edges, reached_before, selector)
-        )
+        exposures.append(_explain(before, target, path, before_edges, selector))
     return exposures
 
 
 def _explain(
     before: Graph,
-    after: Graph,
     target: str,
     path: list[str],
     before_edges: set[tuple[str, str]],
-    reached_before: set[str],
     selector: Selector,
 ) -> Exposure:
     if not before.has_node(target):
@@ -166,19 +164,13 @@ def _explain(
     if new_edge is not None:
         return Exposure(target, "new-edge", f"new edge {new_edge[0]} -> {new_edge[1]}", path)
 
-    if target in reached_before and not selector.matches(before, target):
-        was = before.nodes[target].attrs.get(selector.key, "unset")
-        return Exposure(
-            target,
-            "reclassified",
-            f"already reachable, and {selector.key} changed from {was!r} to {selector.value!r}",
-            path,
-        )
-
+    # Nothing on the path is new and the target existed, so it was reachable before;
+    # since it was not exposed then, its classification is what changed.
+    was = before.nodes[target].attrs.get(selector.key, "unset")
     return Exposure(
         target,
-        "newly-reachable",
-        "reachable through edges that already existed; an upstream change opened the route",
+        "reclassified",
+        f"already reachable, and {selector.key} changed from {was!r} to {selector.value!r}",
         path,
     )
 
