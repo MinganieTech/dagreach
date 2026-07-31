@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from dagreach import __version__
-from dagreach.cli import EXIT_INPUT_ERROR, EXIT_NOT_IMPLEMENTED, EXIT_OK, main
+from dagreach.cli import EXIT_INPUT_ERROR, EXIT_OK, main
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -14,11 +14,6 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def test_no_command_prints_help(capsys):
     assert main([]) == EXIT_OK
     assert "dagreach" in capsys.readouterr().out
-
-
-def test_diff_is_declared_but_not_implemented(capsys):
-    assert main(["diff"]) == EXIT_NOT_IMPLEMENTED
-    assert "not implemented" in capsys.readouterr().err
 
 
 def test_version_flag_exits_zero_and_prints_version(capsys):

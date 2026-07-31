@@ -14,8 +14,8 @@ DOT carries structure, not meaning: which way an edge points is a convention, so
 declare it (or warns you when it can tell you got it wrong). See
 [edge semantics](docs/metrics.md#edge-semantics).
 
-> **Status: pre-alpha (0.0.1).** Reading, analysis and policies work; the reach diff, the CI action
-> and the HTML report do not exist yet.
+> **Status: pre-alpha (0.0.1).** Reading, analysis, policies and the reach diff work; the adapters,
+> the CI action and the HTML report do not exist yet.
 
 ## What works today
 
@@ -120,8 +120,8 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T1 | DOT and JSON Graph Format readers, attribute profile, `parse` | done |
 | T2 | Analysis core: reachability, critical path, articulation points, width | done |
 | T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
-| T4 | Reach diff between two graphs, `--fail-on-new-reach` | next |
-| T5 | Adapters: Terraform, dbt, a pipeline format, generic | |
+| T4 | Reach diff between two graphs, `--fail-on-new-reach` | done |
+| T5 | Adapters: Terraform, dbt, a pipeline format, generic | next |
 | T6 | GitHub Action and pull-request comment | |
 | T7 | Self-contained HTML report | |
 

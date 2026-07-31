@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from dagreach.analysis import CriticalPath, GraphStats, ImpactReport, format_number
+from dagreach.diff import AllPairsDelta, Exposure, ReachDiff
 from dagreach.model import Graph
 from dagreach.policy import PolicyResult
 from dagreach.profile import ProfileSummary
@@ -333,3 +334,136 @@ def warning_lines(warnings: list[str]) -> list[str]:
     if not warnings:
         return []
     return [f"warnings ({len(warnings)}):", *(f"  - {warning}" for warning in warnings)]
+
+
+# --------------------------------------------------------------------------
+# diff
+# --------------------------------------------------------------------------
+
+
+def diff_text(
+    before: Graph,
+    after: Graph,
+    diff: ReachDiff,
+    exposures: list[Exposure],
+    policies: list[PolicyResult],
+    limit: int,
+    *,
+    explain: bool = False,
+    all_pairs: AllPairsDelta | None = None,
+    count_only: bool = False,
+) -> list[str]:
+    lines = [
+        f"{before.source or '<before>'} -> {after.source or '<after>'}: "
+        f"{listing(diff.seeds, limit)} reaches {len(diff.reached_after)} nodes, "
+        f"was {len(diff.reached_before)} (+{len(diff.added)}, -{len(diff.removed)})",
+        edge_semantics_line(after),
+    ]
+
+    if diff.seeds_missing_before:
+        lines.append(
+            f"new in this version ({len(diff.seeds_missing_before)}): "
+            f"{listing(diff.seeds_missing_before, limit)}"
+        )
+    if diff.seeds_missing_after:
+        lines.append(
+            f"gone in this version ({len(diff.seeds_missing_after)}): "
+            f"{listing(diff.seeds_missing_after, limit)}"
+        )
+
+    lines.append(f"new reach ({len(diff.added)}): {listing(diff.added, limit)}")
+    if diff.removed:
+        lines.append(f"lost reach ({len(diff.removed)}): {listing(diff.removed, limit)}")
+    lines.append(
+        "structure: "
+        f"{len(diff.nodes_added)} node(s) added, {len(diff.nodes_removed)} removed, "
+        f"{len(diff.edges_added)} edge(s) added, {len(diff.edges_removed)} removed"
+    )
+
+    if explain:
+        lines.extend(exposure_lines(exposures, limit))
+
+    if all_pairs is not None:
+        lines.extend(all_pairs_lines(all_pairs, limit, count_only=count_only))
+
+    lines.extend(policy_lines(policies, limit))
+    lines.extend(warning_lines([*before.warnings, *after.warnings]))
+    return lines
+
+
+def exposure_lines(exposures: list[Exposure], limit: int) -> list[str]:
+    if not exposures:
+        return ["why: no target became newly reachable"]
+    shown = exposures if limit <= 0 else exposures[:limit]
+    lines = [f"why ({len(shown)} of {len(exposures)} shown):"]
+    for exposure in shown:
+        lines.append(f"  {exposure.target} is now reached")
+        lines.append(f"    reason: {exposure.detail}")
+        if exposure.path:
+            lines.append(f"    path:   {path_line(exposure.path, limit)}")
+    return lines
+
+
+def all_pairs_lines(delta: AllPairsDelta, limit: int, *, count_only: bool) -> list[str]:
+    lines = [
+        f"all-pairs reachability delta: +{delta.added_total} pair(s), "
+        f"-{delta.removed_total} pair(s) over {delta.sources} source(s)"
+    ]
+    if count_only:
+        return lines
+    lines.append("  by source, largest first: " + _by_source(delta.added_by_source, limit, "+"))
+    if delta.removed_by_source:
+        lines.append(
+            "  lost, largest first:     " + _by_source(delta.removed_by_source, limit, "-")
+        )
+    return lines
+
+
+def _by_source(counts: dict[str, int], limit: int, sign: str) -> str:
+    if not counts:
+        return "none"
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    shown = ranked if limit <= 0 else ranked[:limit]
+    rendered = ", ".join(f"{node} {sign}{count}" for node, count in shown)
+    hidden = len(ranked) - len(shown)
+    return rendered + (f" (+{hidden} more source(s))" if hidden else "")
+
+
+def diff_json(
+    before: Graph,
+    after: Graph,
+    diff: ReachDiff,
+    exposures: list[Exposure],
+    policies: list[PolicyResult],
+    *,
+    all_pairs: AllPairsDelta | None = None,
+) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "before": before.source,
+        "after": after.source,
+        "edge_semantics": after.edge_semantics,
+        "changed": diff.seeds,
+        "changed_missing_before": diff.seeds_missing_before,
+        "changed_missing_after": diff.seeds_missing_after,
+        "reached_before": diff.reached_before,
+        "reached_after": diff.reached_after,
+        "added_reach": diff.added,
+        "removed_reach": diff.removed,
+        "nodes_added": diff.nodes_added,
+        "nodes_removed": diff.nodes_removed,
+        "edges_added": [list(key) for key in diff.edges_added],
+        "edges_removed": [list(key) for key in diff.edges_removed],
+        "exposures": [exposure.as_json() for exposure in exposures],
+        "policies": [result.as_json() for result in policies],
+        "warnings": [*before.warnings, *after.warnings],
+    }
+    if all_pairs is not None:
+        document["all_pairs_reachability_delta"] = {
+            "added_pairs": all_pairs.added_total,
+            "removed_pairs": all_pairs.removed_total,
+            "sources": all_pairs.sources,
+            "added_by_source": all_pairs.added_by_source,
+            "removed_by_source": all_pairs.removed_by_source,
+        }
+    return document
