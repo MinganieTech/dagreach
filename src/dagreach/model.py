@@ -43,6 +43,7 @@ class Graph:
     directed: bool = True
     source: str | None = None
     format: str | None = None
+    profile: str | None = None
     edge_semantics: str = "feeds"
     nodes: dict[str, Node] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)

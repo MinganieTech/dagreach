@@ -10,12 +10,12 @@ a dbt manifest, a pipeline export, a service map, an SBOM, a plan you generated 
 Give it a graph and what changed; get the affected surface, the reasons, and a CI decision. No
 database, no daemon, no runtime dependency — a file in, an answer out.
 
-DOT carries structure, not meaning: which way an edge points is a convention, so dagreach makes you
-declare it (or warns you when it can tell you got it wrong). See
-[edge semantics](docs/metrics.md#edge-semantics).
+DOT carries structure, not meaning: which way an edge points is a convention. **Profiles** carry
+that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — and it warns rather
+than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
-> **Status: pre-alpha (0.0.1).** Reading, analysis, policies and the reach diff work; the adapters,
-> the CI action and the HTML report do not exist yet.
+> **Status: pre-alpha (0.0.1).** Reading, analysis, policies, the reach diff and the first profiles
+> work; the CI action and the HTML report do not exist yet.
 
 ## What works today
 
@@ -85,6 +85,26 @@ the output says so. A cyclic graph is not an error: the cycles are listed and co
 metrics that need acyclicity are measured, and the report says it did that. Every definition is in
 [docs/metrics.md](docs/metrics.md).
 
+### Profiles — the producer's conventions, so you do not have to know them
+
+```bash
+terraform graph > infra.dot
+dagreach impact infra.dot --changed aws_vpc.main          # runs backwards, because Terraform does
+
+dbt parse
+dagreach impact target/manifest.json --changed source.shop.orders --explain
+
+syft dir:. -o cyclonedx-json > sbom.json
+dagreach impact sbom.json --changed 'pkg:npm/qs@6.11.0' --fail-if-reaches group=root
+```
+
+Each profile knows the format, the edge direction, and the conventions worth normalising —
+Terraform's `[root] aws_vpc.main (expand)` becomes `aws_vpc.main`, dbt resource types and
+CycloneDX component types become groups a policy can select on. The profile is detected from the
+file, the report says which one was applied, and `--profile` or `--edge-semantics` overrides it.
+`dagreach profiles` lists them. Adding one is a few dozen lines: see
+[docs/profiles.md](docs/profiles.md).
+
 ### `parse` — does my export even load?
 
 ```console
@@ -121,8 +141,8 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T2 | Analysis core: reachability, critical path, articulation points, width | done |
 | T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
 | T4 | Reach diff between two graphs, `--fail-on-new-reach` | done |
-| T5 | Adapters: Terraform, dbt, a pipeline format, generic | next |
-| T6 | GitHub Action and pull-request comment | |
+| T5 | Profiles: Terraform, dbt, CycloneDX, generic | done |
+| T6 | GitHub Action and pull-request comment | next |
 | T7 | Self-contained HTML report | |
 
 Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.

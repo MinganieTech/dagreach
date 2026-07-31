@@ -14,9 +14,11 @@ import sys
 from collections.abc import Sequence
 
 from dagreach import __version__, render
+from dagreach.adapters import PROFILES
 from dagreach.analysis import analyse, impact
 from dagreach.diff import all_pairs_delta, newly_exposed, reach_diff
 from dagreach.errors import DagreachError
+from dagreach.loading import load_graph
 from dagreach.model import Graph
 from dagreach.policy import (
     PolicyResult,
@@ -27,14 +29,9 @@ from dagreach.policy import (
     max_impacted,
 )
 from dagreach.profile import summarize
-from dagreach.readers import FORMATS, read
+from dagreach.readers import FORMATS
 from dagreach.selectors import SELECTOR_KEYS, parse_selector
-from dagreach.semantics import (
-    DEFAULT_SEMANTICS,
-    EDGE_SEMANTICS,
-    orient,
-    warn_if_orientation_is_suspect,
-)
+from dagreach.semantics import DEFAULT_SEMANTICS, EDGE_SEMANTICS
 
 # Exit codes are part of the public contract (CI depends on them).
 EXIT_OK = 0
@@ -142,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
     diff_command.add_argument("before", metavar="BEFORE", help="the graph as it was")
     diff_command.add_argument("after", metavar="AFTER", help="the graph as it is now")
     diff_command.add_argument(
+        "--profile",
+        choices=list(PROFILES),
+        help="read both files with a producer's conventions (see `dagreach profiles`)",
+    )
+    diff_command.add_argument(
         "--format", choices=FORMATS, help="read both files as this format instead of detecting it"
     )
     diff_command.add_argument(
@@ -188,6 +190,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="with --all-pairs-reachability-delta, report totals without the per-source ranking",
     )
 
+    subparsers.add_parser(
+        "profiles",
+        help="list the producer profiles dagreach knows",
+        description="List the producer profiles: what each one reads, and how its edges point.",
+    )
+
     for name, help_text in _PLANNED.items():
         subparsers.add_parser(name, help=f"[not implemented] {help_text}")
     return parser
@@ -196,6 +204,14 @@ def build_parser() -> argparse.ArgumentParser:
 def _add_input_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "file", metavar="FILE", help="path to a DOT or JSON Graph Format file, or - for stdin"
+    )
+    command.add_argument(
+        "--profile",
+        choices=list(PROFILES),
+        help=(
+            "read the file with a producer's conventions; detected from the content when "
+            "omitted (see `dagreach profiles`)"
+        ),
     )
     command.add_argument(
         "--format", choices=FORMATS, help="skip format detection and read the file as this format"
@@ -232,11 +248,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.print_help()
         return EXIT_OK
 
+    if args.command == "profiles":
+        for line in render.profiles_text(PROFILES):
+            print(line)
+        return EXIT_OK
+
     if args.command in {"parse", "stats", "impact"}:
         try:
-            graph = read(args.file, format=args.format)
-            graph = orient(graph, args.edge_semantics or DEFAULT_SEMANTICS)
-            warn_if_orientation_is_suspect(graph, args.edge_semantics)
+            graph = load_graph(
+                args.file,
+                profile=args.profile,
+                format=args.format,
+                edge_semantics=args.edge_semantics,
+            )
         except DagreachError as exc:
             print(f"dagreach: {exc}", file=sys.stderr)
             return EXIT_INPUT_ERROR
@@ -376,10 +400,12 @@ def _run_diff(args: argparse.Namespace) -> int:
 
 
 def _load(path: str, args: argparse.Namespace) -> Graph:
-    graph = read(path, format=args.format)
-    graph = orient(graph, args.edge_semantics or DEFAULT_SEMANTICS)
-    warn_if_orientation_is_suspect(graph, args.edge_semantics)
-    return graph
+    return load_graph(
+        path,
+        profile=args.profile,
+        format=args.format,
+        edge_semantics=args.edge_semantics,
+    )
 
 
 def _emit(as_json: bool, document: dict, lines: list[str]) -> None:

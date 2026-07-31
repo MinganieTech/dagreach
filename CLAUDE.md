@@ -31,6 +31,9 @@ The metrics exist to support that decision; they are not the product.
   implemented, `4` the input could not be read). CI pipelines depend on them; changing one is a
   breaking change. A broken selector or a missing file must never exit `1`: an unusable input must
   not be indistinguishable from a clean gate.
+- **A profile states what it decided.** An identifier it rewrote keeps the original as an
+  attribute, a fallback it took is a warning, and detection itself is announced. `load` returns the
+  producer's own orientation; the single reversal stays in `semantics.orient`.
 - **Never guess which way an edge points.** The orientation applied is stated in every report, and
   a file whose shape contradicts it raises a warning. A graph read backwards produces confident,
   fluent nonsense - the worst failure this tool can have.

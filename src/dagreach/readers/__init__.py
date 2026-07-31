@@ -17,25 +17,35 @@ _DOT_EXTENSIONS = {".dot", ".gv"}
 _JGF_EXTENSIONS = {".json", ".jgf"}
 _DOT_HEAD = re.compile(r"^\s*(strict\s+)?(di)?graph\b", re.IGNORECASE)
 
-__all__ = ["FORMATS", "detect_format", "parse_dot", "parse_jgf", "read", "read_text"]
+__all__ = [
+    "FORMATS",
+    "detect_format",
+    "parse_dot",
+    "parse_jgf",
+    "read",
+    "read_source",
+    "read_text",
+]
+
+
+def read_source(path: str | Path) -> tuple[str, str]:
+    """The text of `path` (or standard input when it is `-`), and a name for it."""
+    if str(path) == "-":
+        return sys.stdin.read(), "<stdin>"
+    file_path = Path(path)
+    try:
+        return file_path.read_text(encoding="utf-8"), str(file_path)
+    except FileNotFoundError as exc:
+        raise DagreachError(f"{file_path}: no such file") from exc
+    except IsADirectoryError as exc:
+        raise DagreachError(f"{file_path}: is a directory, not a graph") from exc
+    except UnicodeDecodeError as exc:
+        raise DagreachError(f"{file_path}: not UTF-8 text") from exc
 
 
 def read(path: str | Path, *, format: str | None = None) -> Graph:
     """Read a graph from `path`, or from standard input when `path` is `-`."""
-    if str(path) == "-":
-        text = sys.stdin.read()
-        source = "<stdin>"
-    else:
-        file_path = Path(path)
-        try:
-            text = file_path.read_text(encoding="utf-8")
-        except FileNotFoundError as exc:
-            raise DagreachError(f"{file_path}: no such file") from exc
-        except IsADirectoryError as exc:
-            raise DagreachError(f"{file_path}: is a directory, not a graph") from exc
-        except UnicodeDecodeError as exc:
-            raise DagreachError(f"{file_path}: not UTF-8 text") from exc
-        source = str(file_path)
+    text, source = read_source(path)
     return read_text(text, source=source, format=format, hint=path)
 
 
