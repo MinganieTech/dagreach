@@ -1,0 +1,16 @@
+{
+  "graph": {
+    "id": "services",
+    "directed": true,
+    "nodes": {
+      "gateway": { "label": "API gateway", "metadata": { "group": "edge" } },
+      "auth": { "metadata": { "group": "core", "duration": "30" } },
+      "billing": { "metadata": { "group": "core" } }
+    },
+    "edges": [
+      { "source": "gateway", "target": "auth" },
+      { "source": "gateway", "target": "billing" },
+      { "source": "billing", "target": "auth" }
+    ]
+  }
+}

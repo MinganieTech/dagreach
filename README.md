@@ -9,9 +9,31 @@ tree, anything that speaks DOT.
 
 No database, no daemon, no runtime to install alongside. A file in, an answer out.
 
-> **Status: pre-alpha (0.0.1).** This release is a skeleton — the command surface is declared, the
-> analysis is not implemented yet. Watch the repository if you want to be told when it does
-> something useful.
+> **Status: pre-alpha (0.0.1).** Reading works; the analysis does not exist yet. Watch the
+> repository if you want to be told when it does something useful.
+
+## What works today
+
+`dagreach parse` reads a graph and tells you what it understood — the cheapest way to find out
+whether your export is usable before any analysis exists.
+
+```console
+$ terraform graph | dagreach parse -
+<stdin>: dot, directed, 42 nodes, 61 edges
+profile: durations on 0/42 nodes, 0 status value(s), 0 group(s)
+
+$ dagreach parse pipeline.json --json
+{ "format": "jgf", "nodes": 5, "edges": 4, "profile": { ... }, "warnings": [] }
+```
+
+It reads DOT (`.dot`, `.gv`) and JSON Graph Format (`.json`), from a file or from stdin, and
+guesses which one you gave it. Four optional attributes — `duration`, `weight`, `status`, `group` —
+carry meaning; see [docs/attribute-profile.md](docs/attribute-profile.md). Everything else is kept
+verbatim.
+
+Recoverable oddities are reported, never silently absorbed: parallel edges collapsed by `strict`,
+endpoints that were never declared, durations that are not numbers, spellings outside the
+specification. Syntax errors point at a line and a column.
 
 ## What it will do
 
@@ -32,8 +54,8 @@ $ dagreach stats infra.dot --json
 | Slice | Content | State |
 |---|---|---|
 | T0 | Repository, license, CI, command skeleton | done |
-| T1 | DOT and JSON Graph Format readers, attribute profile | next |
-| T2 | Analysis core: reachability, critical path, articulation points, width | |
+| T1 | DOT and JSON Graph Format readers, attribute profile, `parse` | done |
+| T2 | Analysis core: reachability, critical path, articulation points, width | next |
 | T3 | Structural diff and metric deltas, CI exit codes | |
 | T4 | GitHub Action and pull-request comment | |
 | T5 | Self-contained HTML report | |

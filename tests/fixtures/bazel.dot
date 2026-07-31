@@ -1,0 +1,11 @@
+// Modeled on `bazel query 'deps(//src:app)' --output graph`, factored form:
+// topologically equivalent targets are merged into one node whose label holds
+// several target names separated by a literal \n.
+digraph mygraph {
+  node [shape=box];
+  "//src:app"
+  "//src:app" -> "//src:lib"
+  "//src:app" -> "//src:resources\n//src:assets"
+  "//src:lib" -> "//third_party:jackson\n//third_party:guava"
+  "//src:resources\n//src:assets" -> "//third_party:jackson\n//third_party:guava"
+}
