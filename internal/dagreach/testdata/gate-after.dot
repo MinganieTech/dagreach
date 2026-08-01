@@ -1,0 +1,14 @@
+// The same map after one edge was added. It looks harmless in review, and it
+// opens a route from auth to a production service.
+digraph services {
+	auth      [group = "core"]
+	token     [group = "core"]
+	reporting [group = "analytics"]
+	payments  [group = "production"]
+	ledger    [group = "production"]
+
+	auth -> token
+	token -> payments
+	reporting -> payments
+	ledger -> payments
+}

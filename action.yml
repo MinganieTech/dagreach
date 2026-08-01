@@ -134,8 +134,12 @@ runs:
 
         report="$RUNNER_TEMP/dagreach-report.md"
         echo "running: dagreach ${args[*]}"
+        # `shell: bash` runs with -e, and a failing policy is exit 1 on purpose:
+        # without this the step would die here and never comment.
+        set +e
         "$RUNNER_TEMP/dagreach" "${args[@]}" --markdown > "$report"
         code=$?
+        set -e
         cat "$report"
 
         verdict=pass
