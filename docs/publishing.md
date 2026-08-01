@@ -1,8 +1,8 @@
-# Before this repository goes public
+# Publishing
 
-The repository is private until the work is complete and its owner has run a user acceptance test.
-Everything below is what must be true on the day it flips, gathered as it came up rather than
-invented at the end.
+Written while the repository was private, as the list of what had to be true on the day it went
+public. It is kept as the record of what was decided and what is still owed: a checklist thrown
+away once it is ticked teaches nobody why.
 
 ## Claims
 
@@ -12,7 +12,7 @@ invented at the end.
       a tag that disagrees with it.
 - [ ] `.github/release-notes.md` still says "release candidate before 1.0". It is the body of every
       release, so it is the thing to revisit when that stops being true.
-- [ ] The repository description and topics say what the tool does, in the words people search for.
+- [x] The repository description and topics say what the tool does, in the words people search for.
 
 ## Releasing
 
@@ -39,13 +39,18 @@ somebody can depend on it, and that is the list below.
 
 ## The user acceptance test
 
-One real graph per producer, because the profiles are where a wrong answer is confident rather than
-loud:
+**Deliberately not a gate on the release.** The owner's decision, taken with the release candidate
+in hand: a repository nobody has been told about is a safer place to find out than a checklist, and
+anything the real graphs turn up is addressed as a fix on top of `rc.1` rather than held for before
+it.
 
-- [ ] a `terraform graph` from a live stack
-- [ ] a `dbt` manifest from a real project
-- [ ] a CycloneDX SBOM from a real scan
-- [ ] one generic graph nobody wrote a profile for
+The graphs still worth running it against, because the profiles are where a wrong answer is
+confident rather than loud:
+
+- a `terraform graph` from a live stack
+- a `dbt` manifest from a real project
+- a CycloneDX SBOM from a real scan
+- one generic graph nobody wrote a profile for
 
 For each: does `parse` load it, does the orientation line say the right thing, and does one policy
 answer a question its owner already knows the answer to? That last one is the test — a gate is only
@@ -53,22 +58,19 @@ worth trusting where it agrees with somebody who knows.
 
 ## What a stranger will read
 
-- [ ] `CLAUDE.md` is no longer tracked - it holds working conventions for the owner and the
-      assistant, not documentation for readers. It remains in every commit that carried it, and the
-      decision taken is to **rewrite the history to remove it before the repository goes public**:
-      one pass with `git filter-repo`, cheap while the repository has one author and impossible to
-      do cleanly afterwards. Anything in the file that readers *should* have belongs in `docs/`.
+- [x] `CLAUDE.md` is gone from the history, not merely untracked: one pass of
+      `git filter-repo --invert-paths --path CLAUDE.md` before the tag, because it costs one command
+      while the repository has one author and cannot be had cleanly afterwards. It held working
+      conventions for the owner and the assistant, no secret and nothing about another project, so
+      this was a preference about what the history reveals rather than a necessity.
 
-      Reviewed since, and worth recording: the file holds no secret and nothing about another
-      project, so the rewrite is a preference about what the history reveals, not a necessity. It
-      costs one command now and cannot be had later - which is the only reason to keep it on this
-      list. Dropping it changes nothing else. The `Co-Authored-By: Claude` trailers are not a
-      reason either way.
-- [ ] The branches. `main` is the product; `spike/go-port` holds the Python-to-Go measurement and is
-      worth keeping only if the reasoning is worth showing. Anything merged is deleted.
-- [ ] History and pull requests carry no secrets and nothing about unrelated projects. Verified
-      today: no such reference exists in any file, commit message, or branch.
-- [ ] `examples/` is the front door for most readers. It is organised by outcome and every example
+      Two commits went with it - they touched that file and nothing else - and the resulting tree is
+      byte-identical to the one before the rewrite. The `Co-Authored-By: Claude` trailers stay:
+      they were never a reason either way.
+- [x] The branches. `spike/go-port` is deleted; `main` is the product and the only branch.
+- [x] History and pull requests carry no secrets and nothing about unrelated projects. Verified
+      before publishing: no such reference exists in any file, commit message, or branch.
+- [x] `examples/` is the front door for most readers. It is organised by outcome and every example
       runs in CI; keep it that way.
 
 ## Honest limits, stated rather than discovered
