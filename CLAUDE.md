@@ -34,6 +34,10 @@ The metrics exist to support that decision; they are not the product.
   could not be read; `3` is retired). CI pipelines depend on them; changing one is a breaking
   change. A broken selector or a missing file must never exit `1`: an unusable input must
   not be indistinguishable from a clean gate.
+- **A format is only supported when it carries a graph.** DOT and JSON Graph Format do; YAML does
+  not, so there is no generic YAML reader - only producer profiles that happen to read YAML. The
+  same test applies to any future format: if reading it generically would require guessing what a
+  node or an edge is, it becomes a profile or nothing.
 - **A profile states what it decided.** An identifier it rewrote keeps the original as an
   attribute, a fallback it took is a warning, and detection itself is announced. `load` returns the
   producer's own orientation; the single reversal stays in `semantics.orient`.

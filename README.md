@@ -143,9 +143,14 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
 | T4 | Reach diff between two graphs, `--fail-on-new-reach` | done |
 | T5 | Profiles: Terraform, dbt, CycloneDX, generic | done |
-| — | CI pipeline profiles (GitHub Actions, GitLab CI) | [undecided](docs/decisions-ci-yaml.md) |
 | T6 | GitHub Action and pull-request comment | next |
+| T6.1 | PASS / FAIL / UNKNOWN verdict qualification | |
+| T6.2 | Experimental GitHub Actions profile (see [the decisions](docs/decisions-ci-yaml.md)) | |
 | T7 | Self-contained HTML report | |
+
+There is no generic YAML reader and there will not be one: YAML carries no graph semantics, so
+reading it generically would mean guessing. A producer profile that happens to read YAML is a
+different thing — see [the GitHub Actions decisions](docs/decisions-ci-yaml.md).
 
 Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.
 
