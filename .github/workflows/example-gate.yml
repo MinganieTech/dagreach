@@ -40,3 +40,19 @@ jobs:
           changed: source.acme_analytics.shop.orders
           max-impacted: "100"
           comment-tag: data-lineage
+
+  new-route:
+    name: Did this change open a new route to production?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          command: diff
+          before: internal/dagreach/testdata/gate-before.dot
+          after: internal/dagreach/testdata/gate-after.dot
+          changed: auth
+          fail-on-new-reach: group=production
+          comment-tag: new-route
+        # Also meant to fail: one added edge, and auth now reaches payments.
+        continue-on-error: true

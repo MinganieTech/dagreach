@@ -1,0 +1,13 @@
+// A small service map, before the change: nothing that auth touches reaches
+// production. Used by the example gate to demonstrate a reach diff.
+digraph services {
+	auth      [group = "core"]
+	token     [group = "core"]
+	reporting [group = "analytics"]
+	payments  [group = "production"]
+	ledger    [group = "production"]
+
+	auth -> token
+	reporting -> payments
+	ledger -> payments
+}
