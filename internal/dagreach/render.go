@@ -453,12 +453,18 @@ func sourceName(g *Graph) string {
 // disagree about what happened; the rest travels inside a collapsed block, and
 // the verdicts sit at the top where a reviewer reads them. A third verdict slots
 // into this table without changing its shape.
+//
+// Everything that came from the graph goes through mdText or mdCode. Node
+// identifiers are written by whoever opened the pull request, and a comment a
+// contributor can forge is a gate a contributor can defeat: a `|` closes a table
+// cell, a backtick closes a code span, and a line of backticks closes the block
+// the whole report sits in.
 func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string {
 	if len(body) == 0 {
 		return []string{"### dagreach", "", "_nothing to report._"}
 	}
 
-	lines := []string{"### dagreach", "", body[0], ""}
+	lines := []string{"### dagreach", "", mdText(body[0]), ""}
 
 	if len(policies) > 0 {
 		lines = append(lines, "| verdict | policy | detail |", "| --- | --- | --- |")
@@ -470,8 +476,8 @@ func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string
 			case VerdictUnknown:
 				verdict = "**UNKNOWN**"
 			}
-			lines = append(lines, fmt.Sprintf("| %s | `%s %s` | %s |",
-				verdict, result.Policy, result.Subject, result.Detail))
+			lines = append(lines, fmt.Sprintf("| %s | %s | %s |",
+				verdict, mdCodeCell(result.Policy+" "+result.Subject), mdText(result.Detail)))
 		}
 		lines = append(lines, "")
 
@@ -485,10 +491,10 @@ func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string
 			}
 			for _, node := range shown {
 				if witness, ok := result.Witnesses[node]; ok && len(witness) > 0 {
-					lines = append(lines, fmt.Sprintf("- `%s` &larr; `%s`",
-						node, strings.Join(witness, " -> ")))
+					lines = append(lines, fmt.Sprintf("- %s &larr; %s",
+						mdCode(node), mdCode(strings.Join(witness, " -> "))))
 				} else {
-					lines = append(lines, fmt.Sprintf("- `%s`", node))
+					lines = append(lines, "- "+mdCode(node))
 				}
 			}
 			if limit > 0 && len(result.Matched) > limit {
@@ -498,7 +504,88 @@ func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string
 		}
 	}
 
-	lines = append(lines, "<details>", "<summary>Full report</summary>", "", "```text")
+	fence := longestFence(body[1:])
+	lines = append(lines, "<details>", "<summary>Full report</summary>", "", fence+"text")
 	lines = append(lines, body[1:]...)
-	return append(lines, "```", "", "</details>")
+	return append(lines, fence, "", "</details>")
+}
+
+// markdownSpecials are the characters that change a document's structure rather
+// than its wording. Escaping them turns forged markup back into the text it
+// claimed to be.
+const markdownSpecials = "\\`*_[]<>|#"
+
+// mdText renders graph text as prose: structure-bearing characters are escaped
+// and line breaks are flattened, because a line break inside a table cell ends
+// the table.
+func mdText(text string) string {
+	var built strings.Builder
+	for _, character := range flattenLines(text) {
+		if strings.ContainsRune(markdownSpecials, character) {
+			built.WriteByte('\\')
+		}
+		built.WriteRune(character)
+	}
+	return built.String()
+}
+
+// mdCodeCell renders a code span that sits in a table cell. `|` splits a cell
+// even inside a code span, so it is escaped there and only there - GitHub
+// unescapes it again when it builds the row, while a bullet list would show the
+// backslash.
+func mdCodeCell(text string) string {
+	return mdCode(strings.ReplaceAll(flattenLines(text), "|", "\\|"))
+}
+
+// mdCode renders graph text as a code span. Backticks cannot be escaped inside
+// one, so the delimiter grows past the longest run the content holds - which is
+// what the CommonMark rule is for - and a leading or trailing backtick gets the
+// padding space the same rule requires.
+func mdCode(text string) string {
+	text = flattenLines(text)
+	delimiter := strings.Repeat("`", longestRun(text, '`')+1)
+	padding := ""
+	if strings.HasPrefix(text, "`") || strings.HasSuffix(text, "`") {
+		padding = " "
+	}
+	return delimiter + padding + text + padding + delimiter
+}
+
+// longestFence is a fence longer than any run of backticks in the block it has
+// to close, so a report line cannot end the block early.
+func longestFence(lines []string) string {
+	longest := 0
+	for _, line := range lines {
+		if run := longestRun(line, '`'); run > longest {
+			longest = run
+		}
+	}
+	if longest < 3 {
+		longest = 3
+	} else {
+		longest++
+	}
+	return strings.Repeat("`", longest)
+}
+
+func longestRun(text string, character byte) int {
+	longest, current := 0, 0
+	for index := 0; index < len(text); index++ {
+		if text[index] != character {
+			current = 0
+			continue
+		}
+		current++
+		if current > longest {
+			longest = current
+		}
+	}
+	return longest
+}
+
+// flattenLines turns every kind of line break into a space: a report is a
+// document with a shape, and text from a file must not be able to change it.
+func flattenLines(text string) string {
+	replacer := strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
+	return replacer.Replace(text)
 }

@@ -146,3 +146,24 @@ func TestReadsStdin(t *testing.T) {
 		t.Errorf("text=%q source=%q err=%v", text, source, err)
 	}
 }
+
+func TestADocumentIsOneValueAndThenTheEndOfTheFile(t *testing.T) {
+	// Two manifests concatenated by a broken pipeline used to be read as the
+	// first one, and the report would then describe a graph nobody has.
+	for _, text := range []string{
+		`{"a": 1} {"b": 2}`,
+		`{"a": 1} trailing junk`,
+		`{"a": 1}]`,
+	} {
+		if _, err := DecodeOrderedJSON(text); err == nil {
+			t.Errorf("%q was accepted", text)
+		} else if !strings.Contains(err.Error(), "after the end of the document") {
+			t.Errorf("%q -> %v", text, err)
+		}
+	}
+	for _, text := range []string{`{"a": 1}`, "{\"a\": 1}\n\n", "  [1, 2]  "} {
+		if _, err := DecodeOrderedJSON(text); err != nil {
+			t.Errorf("%q -> %v", text, err)
+		}
+	}
+}

@@ -415,11 +415,12 @@ func TestMarkdownIsWhatTheActionPosts(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", fragment, out)
 		}
 	}
-	// The headline is the text report's first line, so the two cannot disagree.
+	// The headline is the text report's first line, escaped for markdown and
+	// otherwise untouched, so the two modes cannot disagree about what happened.
 	_, text, _ := runCLI("impact", path, "--changed", "auth",
 		"--fail-if-reaches", "group=production", "--explain")
-	headline := strings.SplitN(text, "\n", 2)[0]
-	if !strings.Contains(out, headline) {
+	headline := strings.SplitN(strings.ReplaceAll(text, "\r\n", "\n"), "\n", 2)[0]
+	if !strings.Contains(out, mdText(headline)) {
 		t.Errorf("markdown headline differs from the text report:\n%s", headline)
 	}
 }
@@ -624,5 +625,137 @@ func TestTwoOutputModesAreRefusedByName(t *testing.T) {
 	}
 	if !strings.Contains(errOut, "--json and --html") {
 		t.Errorf("the error does not name the two that collided: %s", errOut)
+	}
+}
+
+func TestMarkdownCannotBeForgedByANodeName(t *testing.T) {
+	// Node identifiers are written by whoever opened the pull request. A comment
+	// a contributor can forge is a gate a contributor can defeat.
+	hostile := "digraph {\n" +
+		"  \"a|b\" [group = \"production\"]\n" +
+		"  \"tick`|**bold**\" -> \"a|b\"\n" +
+		"}"
+	path := write(t, "forged.dot", hostile)
+	code, out, _ := runCLI("impact", path, "--changed", "tick`|**bold**",
+		"--fail-if-reaches", "group=production", "--markdown")
+	if code != ExitPolicyFailed {
+		t.Fatalf("code = %d: %s", code, out)
+	}
+
+	table := []string{}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "|") {
+			table = append(table, line)
+		}
+	}
+	for _, row := range table {
+		if cells := strings.Count(row, "|") - strings.Count(row, "\\|"); cells != 4 {
+			t.Errorf("a node identifier changed the shape of the table: %q", row)
+		}
+	}
+	if strings.Contains(out, "**bold**") && !strings.Contains(out, "\\*\\*bold\\*\\*") {
+		t.Error("a node identifier is rendered as markup rather than as its own name")
+	}
+}
+
+func TestTheFullReportBlockCannotBeClosedEarly(t *testing.T) {
+	path := write(t, "fence.dot", "digraph { \"``` heading\" -> b }")
+	_, out, _ := runCLI("impact", path, "--changed", "``` heading", "--markdown")
+	opening := ""
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasSuffix(strings.TrimSpace(line), "text") && strings.HasPrefix(line, "`") {
+			opening = strings.TrimSuffix(strings.TrimSpace(line), "text")
+			break
+		}
+	}
+	if len(opening) < 4 {
+		t.Fatalf("fence = %q, it must outgrow the backticks the report carries:\n%s", opening, out)
+	}
+}
+
+// -- flags a command does not read, and graphs that cannot be compared -------
+
+func TestAPolicyACommandCannotRunIsRefused(t *testing.T) {
+	// The failure this prevents: the command used to accept the flag, never
+	// evaluate it, and exit 0 - a gate that passes because nobody ran it.
+	cases := []struct{ args []string }{
+		{[]string{"diff", "testdata/gate-before.dot", "testdata/gate-after.dot",
+			"--changed", "auth", "--fail-if-reaches", "group=production"}},
+		{[]string{"impact", "testdata/pipeline.jgf.json", "--changed", "extract_orders",
+			"--fail-on-new-reach", "group=production"}},
+		{[]string{"stats", "testdata/pipeline.jgf.json", "--max-impacted", "1"}},
+		{[]string{"parse", "testdata/pipeline.jgf.json", "--fail-if-reaches", "group=x"}},
+		{[]string{"parse", "testdata/pipeline.jgf.json", "--limit", "2"}},
+		{[]string{"stats", "testdata/pipeline.jgf.json", "--explain"}},
+		{[]string{"diff", "testdata/gate-before.dot", "testdata/gate-after.dot",
+			"--changed", "auth", "--fail-on", "cycle"}},
+	}
+	for _, test := range cases {
+		code, out, errOut := runCLI(test.args...)
+		if code != ExitUsage {
+			t.Errorf("%v -> code %d, wanted a usage error\n%s%s", test.args, code, out, errOut)
+			continue
+		}
+		if !strings.Contains(errOut, "does not read") {
+			t.Errorf("%v -> %q", test.args, errOut)
+		}
+	}
+}
+
+func TestCountOnlyNeedsTheComparisonItShortens(t *testing.T) {
+	code, _, errOut := runCLI("diff", "testdata/gate-before.dot", "testdata/gate-after.dot",
+		"--changed", "auth", "--count-only")
+	if code != ExitUsage || !strings.Contains(errOut, "--all-pairs-reachability-delta") {
+		t.Errorf("code=%d err=%q", code, errOut)
+	}
+}
+
+func TestTheFlagsACommandDoesReadStillWork(t *testing.T) {
+	// The guard must refuse the useless, not the useful. Between them these
+	// invocations exercise every flag the parser knows at least once, so a name
+	// misspelled in commandFlags shows up here rather than in somebody's CI.
+	for _, args := range [][]string{
+		{"parse", "testdata/terraform.dot", "--profile", "terraform", "--json"},
+		{"parse", "testdata/gate-before.dot", "--format", "dot", "--edge-semantics", "feeds"},
+		{"parse", "testdata/pipeline.jgf.json", "--markdown"},
+		{"stats", "testdata/pipeline.jgf.json", "--limit", "2", "--fail-on", "cycle", "--html"},
+		{"impact", "testdata/pipeline.jgf.json", "--changed", "extract_orders",
+			"--explain", "--limit", "3", "--max-impacted", "99", "--fail-on", "cycle",
+			"--fail-if-reaches", "group=transform"},
+		{"diff", "testdata/gate-before.dot", "testdata/gate-after.dot", "--changed", "auth",
+			"--explain", "--fail-on-new-reach", "group=production"},
+		{"diff", "testdata/gate-before.dot", "testdata/gate-after.dot",
+			"--all-pairs-reachability-delta", "--count-only"},
+	} {
+		if code, _, errOut := runCLI(args...); code == ExitUsage {
+			t.Errorf("%v was refused: %s", args, errOut)
+		}
+	}
+}
+
+func TestTwoGraphsReadDifferentlyAreNotCompared(t *testing.T) {
+	// One side detected as a dependency export and the other read as `feeds`
+	// means the two are oriented opposite ways, and every delta is backwards.
+	code, out, errOut := runCLI("diff", "testdata/terraform.dot", "testdata/gate-after.dot",
+		"--changed", "auth")
+	if code != ExitInputError {
+		t.Fatalf("code = %d\n%s%s", code, out, errOut)
+	}
+	for _, fragment := range []string{
+		"do not have the same profile", "terraform against generic",
+		"pass --profile to read both files the same way",
+	} {
+		if !strings.Contains(errOut, fragment) {
+			t.Errorf("missing %q in %q", fragment, errOut)
+		}
+	}
+}
+
+func TestSettlingBothFilesMakesTheComparisonPossibleAgain(t *testing.T) {
+	// The refusal has to have a way out, or it is just a wall.
+	code, _, errOut := runCLI("diff", "testdata/gate-before.dot", "testdata/gate-after.dot",
+		"--changed", "auth", "--edge-semantics", "depends-on")
+	if code == ExitInputError {
+		t.Errorf("an explicit semantics settles both files: %s", errOut)
 	}
 }

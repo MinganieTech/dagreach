@@ -13,6 +13,8 @@ package dagreach
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"sort"
 	"strings"
 )
@@ -65,12 +67,21 @@ func (o *Object) Len() int {
 }
 
 // DecodeOrderedJSON decodes a document, preserving object key order.
+//
+// A document is one value followed by the end of the file. Anything after it -
+// a second value, a truncated copy appended by a broken pipeline, trailing
+// junk - is refused rather than ignored: reading the first half of a file in
+// silence is how an analysis ends up describing a graph nobody has.
 func DecodeOrderedJSON(text string) (any, error) {
 	decoder := json.NewDecoder(bytes.NewReader([]byte(text)))
 	decoder.UseNumber()
 	value, err := decodeValue(decoder)
 	if err != nil {
 		return nil, err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return nil, fmt.Errorf("unexpected data after the end of the document, at byte %d",
+			decoder.InputOffset())
 	}
 	return value, nil
 }

@@ -67,10 +67,11 @@ the event is not a pull request.
 | Output | Meaning |
 |---|---|
 | `verdict` | `pass`, `fail`, or `unknown` |
+| `commented` | `true` when the report was posted, `false` on a pull request from a fork |
 | `exit-code` | `0` ok, `1` a policy failed, `2` usage, `3` a policy could not be settled, `4` the input could not be read |
 | `report` | path to the markdown report |
 
-## Three behaviours worth knowing
+## Four behaviours worth knowing
 
 **One comment per tag, updated in place.** A gate that stacks twenty comments on a busy pull
 request is a gate people mute. Give each job its own `comment-tag` when you run several.
@@ -78,6 +79,15 @@ request is a gate people mute. Give each job its own `comment-tag` when you run 
 **An unusable run is not a clean gate.** Exit `2` (bad usage) and `4` (unreadable input) fail the
 step loudly rather than passing quietly — the distinction the exit codes exist for. Only exit `1`
 means a policy actually failed.
+
+**A pull request from a fork gets no comment, and that is not a bug.** Workflows triggered by a
+fork run with a read-only `GITHUB_TOKEN`, so posting would fail the job over a permission nobody can
+grant from the workflow. The action detects the fork, skips the comment, and says so with a
+`::notice::`; the report is still in the job summary and the verdict still gates the build. The
+`commented` output is `false` in that case.
+
+Switching to `pull_request_target` would provide a writable token — and would run the workflow
+against the fork's code with the base repository's secrets. That is not a trade worth a comment.
 
 **UNKNOWN comments, warns, and does not fail the build.** Exit `3` means the graph could not settle
 a policy — usually a selector reading an attribute the producer does not emit. The action posts the

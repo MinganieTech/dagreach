@@ -18,8 +18,9 @@ than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md)
 > acceptance test.** What has to be true on the day it goes public is tracked in
 > [docs/publishing.md](docs/publishing.md).
 >
-> **Pre-alpha detail:** Reading, analysis, policies, the reach diff and the first profiles
-> work; the CI action and the HTML report do not exist yet. Written in Go and shipped as a single
+> **Pre-alpha detail:** everything on the roadmap below is built — reading, analysis, policies, the
+> reach diff, the profiles, the CI action, and the three report formats. What is missing is a
+> release: no tag, no published binary, no external use yet. Written in Go and shipped as a single
 > static binary: nothing to install alongside it.
 
 ## What works today
@@ -144,12 +145,28 @@ endpoints that were never declared, durations that are not numbers, spellings ou
 specification. Syntax errors point at a line and a column. Text output truncates long lists and
 says how many it hid; the JSON report never truncates.
 
-## What it will do
+### `diff` — what a pull request made reachable that was not
 
 ```console
-$ dagreach diff before.dot after.dot --fail-on cycle
-# → nodes and edges added/removed, and what that did to the metrics above
+$ dagreach diff services-before.dot services-after.dot --changed auth \
+    --explain --fail-on-new-reach group=production
+services-before.dot -> services-after.dot: auth reaches 4 nodes, was 3 (+1, -0)
+edges: source feeds target, so impact follows edges forward
+new reach (1): payments
+structure: 0 node(s) added, 0 removed, 1 edge(s) added, 0 removed
+why (1 of 1 shown):
+  payments is now reached
+    reason: new edge token -> payments
+    path:   auth -> token -> payments
+policies:
+  FAIL fail-on-new-reach group=production: 1 target(s) matching group=production became reachable
+    payments: auth -> token -> payments
 ```
+
+Not "which edges changed" — which **reach relationships** became possible. The two files must be
+read the same way to be compared at all: if one is recognised as a dependency export and the other
+is not, they are oriented in opposite directions, so dagreach refuses and asks for `--profile` or
+`--edge-semantics` rather than producing a convincing backwards delta.
 
 ## In CI
 

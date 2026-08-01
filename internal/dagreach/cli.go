@@ -51,6 +51,9 @@ type options struct {
 	allPairs       bool
 	argv           []string
 	countOnly      bool
+	// seen records every flag the command line carried, so a flag the command
+	// does not read can be refused instead of dropped.
+	seen []string
 }
 
 // valued lists the flags that take a value; everything else is a switch.
@@ -58,6 +61,50 @@ var valued = map[string]bool{
 	"--profile": true, "--format": true, "--edge-semantics": true, "--limit": true,
 	"--changed": true, "--fail-if-reaches": true, "--fail-on-new-reach": true,
 	"--fail-on": true, "--max-impacted": true,
+}
+
+// commandFlags is what each command actually reads.
+//
+// A flag a command does not read used to be accepted and then quietly dropped,
+// so `diff --fail-if-reaches group=production` exited 0 with the policy never
+// evaluated - a gate that passes because nobody ran it. Anything not listed here
+// for the command in hand is a usage error, which is the whole point: dagreach
+// refuses to look like a clean run it did not perform.
+var commandFlags = map[string][]string{
+	"parse": {"--profile", "--format", "--edge-semantics"},
+	"stats": {"--profile", "--format", "--edge-semantics", "--limit", "--fail-on"},
+	"impact": {"--profile", "--format", "--edge-semantics", "--limit", "--changed",
+		"--explain", "--fail-if-reaches", "--max-impacted", "--fail-on"},
+	"diff": {"--profile", "--format", "--edge-semantics", "--limit", "--changed",
+		"--explain", "--fail-on-new-reach", "--all-pairs-reachability-delta", "--count-only"},
+}
+
+// outputFlags are read by every command, so they are not repeated above.
+var outputFlags = []string{"--json", "--markdown", "--html"}
+
+// checkFlags refuses a flag this command does not read, and a flag that only
+// means something beside another one.
+func checkFlags(command string, parsed *options) error {
+	known, ok := commandFlags[command]
+	if !ok {
+		return nil
+	}
+	allowed := map[string]bool{}
+	for _, flag := range append(append([]string{}, known...), outputFlags...) {
+		allowed[flag] = true
+	}
+	for _, flag := range parsed.seen {
+		if !allowed[flag] {
+			return fmt.Errorf("%s does not read %s; it reads %s",
+				command, flag, strings.Join(known, ", "))
+		}
+	}
+	if contains(parsed.seen, "--count-only") && !parsed.allPairs {
+		return fmt.Errorf(
+			"--count-only shortens the all-pairs comparison, so it needs " +
+				"--all-pairs-reachability-delta")
+	}
+	return nil
 }
 
 // Run executes one command line and returns its exit code.
@@ -88,6 +135,10 @@ func Run(args []string, stdout, stderr io.Writer, stdin io.Reader) int {
 		fmt.Fprintf(stderr, "dagreach: %v\n", err)
 		return ExitUsage
 	}
+	if err := checkFlags(command, parsed); err != nil {
+		fmt.Fprintf(stderr, "dagreach: %v\n", err)
+		return ExitUsage
+	}
 	// Kept so the HTML report can say how to produce itself again; a file
 	// outlives the terminal that made it.
 	parsed.argv = append([]string{"dagreach"}, args...)
@@ -112,6 +163,9 @@ func parseOptions(args []string) (*options, error) {
 		}
 
 		name, value, hasInline := strings.Cut(argument, "=")
+		if !contains(parsed.seen, name) {
+			parsed.seen = append(parsed.seen, name)
+		}
 		if valued[name] && !hasInline {
 			index++
 			if index >= len(args) {
@@ -298,6 +352,41 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 	return exitFor(policies)
 }
 
+// incomparable reports why two graphs cannot be diffed, or "" when they can.
+//
+// Detection runs per file, so one side can be recognised as a dependency export
+// and the other read as `feeds` - and then the two are oriented in opposite
+// directions and every delta is backwards. A wrong answer that looks right is
+// worse than a refusal, so this refuses. Naming --profile or --edge-semantics
+// settles both files at once, which is the way out.
+func incomparable(before, after *Graph) string {
+	for _, mismatch := range []struct{ what, left, right, remedy string }{
+		{"profile", before.Profile, after.Profile,
+			"pass --profile to read both files the same way"},
+		{"edge semantics", before.EdgeSemantics, after.EdgeSemantics,
+			"pass --edge-semantics to orient both files the same way"},
+		{"direction", directedness(before), directedness(after),
+			"no flag settles this one: the two files disagree about what an edge is"},
+	} {
+		if mismatch.left == mismatch.right {
+			continue
+		}
+		return fmt.Sprintf(
+			"%s and %s do not have the same %s (%s against %s), so a comparison would "+
+				"compare two different readings; %s",
+			sourceName(before), sourceName(after), mismatch.what,
+			mismatch.left, mismatch.right, mismatch.remedy)
+	}
+	return ""
+}
+
+func directedness(g *Graph) string {
+	if g.Directed {
+		return "directed"
+	}
+	return "undirected"
+}
+
 func runDiff(parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
 	if len(parsed.positional) != 2 {
 		fmt.Fprintln(stderr, "dagreach: diff needs BEFORE and AFTER")
@@ -314,6 +403,10 @@ func runDiff(parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
 	after, err := LoadGraph(parsed.positional[1], load)
 	if err != nil {
 		fmt.Fprintf(stderr, "dagreach: %v\n", err)
+		return ExitInputError
+	}
+	if reason := incomparable(before, after); reason != "" {
+		fmt.Fprintf(stderr, "dagreach: %s\n", reason)
 		return ExitInputError
 	}
 

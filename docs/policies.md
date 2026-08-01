@@ -41,6 +41,12 @@ dagreach stats  graph.dot --fail-on cycle
 Flags can be repeated and combined; the command exits `1` if any of them fails, and the report
 lists every policy that was evaluated, whether it failed or not.
 
+**A policy a command cannot run is a usage error, not a silent no-op.** `--fail-if-reaches` belongs
+to `impact`; `--fail-on-new-reach` belongs to `diff`. Passing one to the other used to be accepted
+and then dropped, so `diff … --fail-if-reaches group=production` exited `0` with the policy never
+evaluated — a gate that passes because nobody ran it. Every flag is now checked against the command
+in hand, and an unusable one exits `2` naming what that command does read.
+
 When the only matching node is one of the changed nodes themselves, the policy still fails — a
 change *to* production is a change that reaches production — but the report says so explicitly, so
 the reader is not left guessing.
@@ -99,6 +105,23 @@ on a graph where every node declares a `risk` is a real pass: the question was a
 
 A pipeline can treat `3` as it sees fit — block it like `1` while a producer is being fixed, or let
 it through with a warning — but it will never be confused with a clean gate.
+
+### What UNKNOWN does not catch
+
+**The test is presence, not coverage.** One node declaring the attribute is enough for the graph to
+count as able to answer, and the policy is then settled normally. So a graph where 5 nodes out of
+300 carry `risk` reports a clean `PASS` for `attr:risk=high`, even though the other 295 were never
+classified — they did not match because nobody said what they were.
+
+`UNKNOWN` catches the whole-graph mistake: a selector aimed at an attribute this producer does not
+emit at all, usually a typo in the vocabulary or a profile that was never configured. It does not
+catch a producer that emits the attribute unevenly. Partial classification is a property of your
+export, and dagreach cannot tell an unclassified node from a node classified as "not that".
+
+If a policy has to be trustworthy, make the attribute mandatory in the producer that emits it.
+`dagreach parse` reports how many nodes carry `group`, `status` and a duration, but it does not
+count coverage for the attributes `attr:` reaches — so for those, the producer is the only place the
+guarantee can come from.
 
 ## What it looks like
 
