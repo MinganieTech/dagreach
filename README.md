@@ -133,6 +133,25 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 # → nodes and edges added/removed, and what that did to the metrics above
 ```
 
+## In CI
+
+```yaml
+- uses: actions/checkout@v4
+- run: terraform graph > infra.dot
+- uses: MinganieTech/dagreach@main
+  with:
+    command: impact
+    file: infra.dot
+    changed: aws_vpc.main
+    fail-if-reaches: group=aws_db_instance
+```
+
+The action runs one command, posts the report as a pull-request comment - one comment per tag,
+updated in place rather than stacked - and fails the job when a policy fails. An unusable run
+(exit `2` or `4`) fails loudly instead of passing quietly. See [docs/action.md](docs/action.md).
+
+Every command also takes `--markdown`, which is exactly what the action posts, and `--json`.
+
 ## Roadmap
 
 | Slice | Content | State |
@@ -143,9 +162,12 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
 | T4 | Reach diff between two graphs, `--fail-on-new-reach` | done |
 | T5 | Profiles: Terraform, dbt, CycloneDX, generic | done |
-| T6 | GitHub Action and pull-request comment | next |
-| T6.1 | PASS / FAIL / UNKNOWN verdict qualification | |
+| T6 | GitHub Action, `--markdown`, pull-request comment | done |
+| T6.1 | PASS / FAIL / UNKNOWN verdict qualification | waits for T6.2, which produces the first UNKNOWN |
 | T6.2 | Experimental GitHub Actions profile (see [the decisions](docs/decisions-ci-yaml.md)) | |
+| — | JSON report contract, pinned by golden files | next |
+| — | Corpus with a policy per graph, examples by outcome | |
+| — | Profile-authoring guide | |
 | T7 | Self-contained HTML report | |
 
 There is no generic YAML reader and there will not be one: YAML carries no graph semantics, so

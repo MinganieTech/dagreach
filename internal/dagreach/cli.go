@@ -39,6 +39,7 @@ type options struct {
 	format         string
 	edgeSemantics  string
 	json           bool
+	markdown       bool
 	explain        bool
 	limit          int
 	changed        []string
@@ -135,6 +136,8 @@ func parseOptions(args []string) (*options, error) {
 			parsed.edgeSemantics = value
 		case "--json":
 			parsed.json = true
+		case "--markdown":
+			parsed.markdown = true
 		case "--explain":
 			parsed.explain = true
 		case "--limit":
@@ -168,6 +171,9 @@ func parseOptions(args []string) (*options, error) {
 			return nil, fmt.Errorf("unknown option '%s'", name)
 		}
 	}
+	if parsed.json && parsed.markdown {
+		return nil, fmt.Errorf("--json and --markdown ask for two different outputs; pick one")
+	}
 	return parsed, nil
 }
 
@@ -192,7 +198,7 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 	switch command {
 	case "parse":
 		summary := Summarize(graph)
-		emit(stdout, parsed.json, ParseJSON(graph, summary), ParseText(graph, summary))
+		emit(stdout, parsed, ParseJSON(graph, summary), ParseText(graph, summary), nil)
 		return ExitOK
 	case "stats":
 		stats := Analyse(graph)
@@ -200,8 +206,8 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 		if contains(parsed.failOn, "cycle") {
 			policies = append(policies, FailOnCycle(stats.Cycles, 3))
 		}
-		emit(stdout, parsed.json,
-			StatsJSON(graph, stats, policies), StatsText(graph, stats, parsed.limit, policies))
+		emit(stdout, parsed, StatsJSON(graph, stats, policies),
+			StatsText(graph, stats, parsed.limit, policies), policies)
 		return exitFor(policies)
 	}
 
@@ -242,9 +248,8 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 		policies = append(policies, FailOnCycle(Analyse(graph).Cycles, 3))
 	}
 
-	emit(stdout, parsed.json,
-		ImpactJSON(graph, report, policies, parsed.explain),
-		ImpactText(graph, report, parsed.limit, policies, parsed.explain))
+	emit(stdout, parsed, ImpactJSON(graph, report, policies, parsed.explain),
+		ImpactText(graph, report, parsed.limit, policies, parsed.explain), policies)
 	return exitFor(policies)
 }
 
@@ -302,25 +307,34 @@ func runDiff(parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
 		allPairs = DiffAllPairs(before, after)
 	}
 
-	emit(stdout, parsed.json,
-		DiffJSON(before, after, diff, exposures, policies, allPairs),
+	emit(stdout, parsed, DiffJSON(before, after, diff, exposures, policies, allPairs),
 		DiffText(before, after, diff, exposures, policies,
-			parsed.limit, parsed.explain, allPairs, parsed.countOnly))
+			parsed.limit, parsed.explain, allPairs, parsed.countOnly), policies)
 	return exitFor(policies)
 }
 
-func emit(stdout io.Writer, asJSON bool, document map[string]any, lines []string) {
-	if asJSON {
+// emit writes the one report the caller asked for: text for a terminal, JSON for
+// a pipeline, markdown for a pull-request comment. They state the same facts.
+func emit(
+	stdout io.Writer, parsed *options, document map[string]any,
+	lines []string, policies []*PolicyResult,
+) {
+	switch {
+	case parsed.json:
 		encoded, err := json.MarshalIndent(document, "", "  ")
 		if err != nil {
-			fmt.Fprintf(stdout, "{}\n")
+			fmt.Fprintln(stdout, "{}")
 			return
 		}
 		fmt.Fprintln(stdout, string(encoded))
-		return
-	}
-	for _, line := range lines {
-		fmt.Fprintln(stdout, line)
+	case parsed.markdown:
+		for _, line := range MarkdownReport(lines, policies, parsed.limit) {
+			fmt.Fprintln(stdout, line)
+		}
+	default:
+		for _, line := range lines {
+			fmt.Fprintln(stdout, line)
+		}
 	}
 }
 
@@ -438,6 +452,8 @@ func usage() string {
 		"                         [--fail-on-new-reach SELECTOR]",
 		"                         [--all-pairs-reachability-delta [--count-only]] [--json]",
 		"  dagreach profiles",
+		"",
+		"every command takes --json or --markdown; --markdown is what the GitHub Action posts",
 		"",
 		"selectors: group=VALUE, status=VALUE, node=ID",
 		"exit codes: 0 ok, 1 a policy failed, 2 usage, 4 the input could not be read",

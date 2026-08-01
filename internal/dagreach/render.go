@@ -404,3 +404,58 @@ func sourceName(g *Graph) string {
 	}
 	return g.Source
 }
+
+// -- markdown --------------------------------------------------------------
+
+// MarkdownReport renders a report for a pull-request comment.
+//
+// The first line of the text report is the headline, so the two modes can never
+// disagree about what happened; the rest travels inside a collapsed block, and
+// the verdicts sit at the top where a reviewer reads them. A third verdict slots
+// into this table without changing its shape.
+func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string {
+	if len(body) == 0 {
+		return []string{"### dagreach", "", "_nothing to report._"}
+	}
+
+	lines := []string{"### dagreach", "", body[0], ""}
+
+	if len(policies) > 0 {
+		lines = append(lines, "| verdict | policy | detail |", "| --- | --- | --- |")
+		for _, result := range policies {
+			verdict := "PASS"
+			if result.Failed {
+				verdict = "**FAIL**"
+			}
+			lines = append(lines, fmt.Sprintf("| %s | `%s %s` | %s |",
+				verdict, result.Policy, result.Subject, result.Detail))
+		}
+		lines = append(lines, "")
+
+		for _, result := range policies {
+			if !result.Failed || len(result.Matched) == 0 {
+				continue
+			}
+			shown := result.Matched
+			if limit > 0 && len(shown) > limit {
+				shown = shown[:limit]
+			}
+			for _, node := range shown {
+				if witness, ok := result.Witnesses[node]; ok && len(witness) > 0 {
+					lines = append(lines, fmt.Sprintf("- `%s` &larr; `%s`",
+						node, strings.Join(witness, " -> ")))
+				} else {
+					lines = append(lines, fmt.Sprintf("- `%s`", node))
+				}
+			}
+			if limit > 0 && len(result.Matched) > limit {
+				lines = append(lines, fmt.Sprintf("- (+%d more)", len(result.Matched)-limit))
+			}
+			lines = append(lines, "")
+		}
+	}
+
+	lines = append(lines, "<details>", "<summary>Full report</summary>", "", "```text")
+	lines = append(lines, body[1:]...)
+	return append(lines, "```", "", "</details>")
+}

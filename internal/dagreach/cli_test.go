@@ -395,3 +395,59 @@ func TestDegenerateGraphsStillGetAnAnswer(t *testing.T) {
 		t.Errorf("a self-loop is a cycle: code=%d out=%q", code, out)
 	}
 }
+
+func TestMarkdownIsWhatTheActionPosts(t *testing.T) {
+	path := write(t, "services.dot", services)
+	code, out, _ := runCLI("impact", path, "--changed", "auth",
+		"--fail-if-reaches", "group=production", "--explain", "--markdown")
+	if code != ExitPolicyFailed {
+		t.Fatalf("code = %d", code)
+	}
+	for _, fragment := range []string{
+		"### dagreach",
+		"| verdict | policy | detail |",
+		"| **FAIL** | `fail-if-reaches group=production` |",
+		"- `payments` &larr; `auth -> token -> payments`",
+		"<details>",
+		"```text",
+	} {
+		if !strings.Contains(out, fragment) {
+			t.Errorf("missing %q in:\n%s", fragment, out)
+		}
+	}
+	// The headline is the text report's first line, so the two cannot disagree.
+	_, text, _ := runCLI("impact", path, "--changed", "auth",
+		"--fail-if-reaches", "group=production", "--explain")
+	headline := strings.SplitN(text, "\n", 2)[0]
+	if !strings.Contains(out, headline) {
+		t.Errorf("markdown headline differs from the text report:\n%s", headline)
+	}
+}
+
+func TestMarkdownWithoutPoliciesHasNoVerdictTable(t *testing.T) {
+	code, out, _ := runCLI("stats", "testdata/terraform.dot", "--markdown")
+	if code != ExitOK || strings.Contains(out, "| verdict |") {
+		t.Errorf("code=%d out=%q", code, out)
+	}
+	if !strings.Contains(out, "### dagreach") || !strings.Contains(out, "<details>") {
+		t.Errorf("out = %q", out)
+	}
+}
+
+func TestJSONAndMarkdownAreMutuallyExclusive(t *testing.T) {
+	code, _, errOut := runCLI("stats", "testdata/terraform.dot", "--json", "--markdown")
+	if code != ExitUsage || !strings.Contains(errOut, "pick one") {
+		t.Errorf("code=%d err=%q", code, errOut)
+	}
+}
+
+func TestMarkdownStaysASCII(t *testing.T) {
+	path := write(t, "services.dot", services)
+	_, out, _ := runCLI("impact", path, "--changed", "auth",
+		"--fail-if-reaches", "group=production", "--markdown")
+	for _, char := range out {
+		if char > unicode.MaxASCII {
+			t.Fatalf("non-ASCII %q in the markdown report", char)
+		}
+	}
+}
