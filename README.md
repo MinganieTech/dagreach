@@ -121,8 +121,8 @@ Each profile knows the format, the edge direction, and the conventions worth nor
 Terraform's `[root] aws_vpc.main (expand)` becomes `aws_vpc.main`, dbt resource types and
 CycloneDX component types become groups a policy can select on. The profile is detected from the
 file, the report says which one was applied, and `--profile` or `--edge-semantics` overrides it.
-`dagreach profiles` lists them. Adding one is a few dozen lines: see
-[docs/profiles.md](docs/profiles.md).
+`dagreach profiles` lists them. Adding one is a few dozen lines, and
+[docs/writing-a-profile.md](docs/writing-a-profile.md) is the guide.
 
 ### `parse` — does my export even load?
 
@@ -187,8 +187,8 @@ and pinned by golden files so its shape cannot drift unnoticed.
 | — | Corpus with a policy per graph, examples by outcome | done |
 | — | Selecting on any attribute, `attr:NAME=VALUE`, and the UNKNOWN verdict | done |
 | — | Ranking nodes by what they reach, in `stats` | done |
-| — | Profile-authoring guide | next |
-| T7 | Self-contained HTML report | |
+| — | Profile-authoring guide | done |
+| T7 | Self-contained HTML report | next |
 
 Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.
 

@@ -101,9 +101,14 @@ A profile is an entry in `internal/dagreach/adapters.go` with five things: the n
 it, its edge semantics, a `Load(text, source) (*Graph, error)`, and a `Detect` that recognises the
 format from its first few thousand characters — or returns `false` rather than guessing.
 
-Two rules make a profile trustworthy rather than magic:
+Three rules make a profile trustworthy rather than magic:
 
-- **`load` returns the graph in the producer's own orientation.** The single reversal happens later,
+- **`Load` returns the graph in the producer's own orientation.** The single reversal happens later,
   in one place, driven by the declared semantics.
 - **Anything the profile decided is visible**: an identifier it rewrote keeps the original as an
   attribute, a fallback it took is a warning, and detection itself is announced.
+- **Attributes keep the producer's own names.** `group`, `status` and `duration` are the only three
+  dagreach reads; everything else stays as it was written and is selectable with `attr:NAME=VALUE`.
+
+**[writing-a-profile.md](writing-a-profile.md) is the full guide** — when a profile is worth it,
+the graph API, what to test, and a checklist.

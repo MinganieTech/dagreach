@@ -262,3 +262,58 @@ func TestOrientReversesOnceAtTheDoor(t *testing.T) {
 		t.Errorf("semantics = %q", graph.EdgeSemantics)
 	}
 }
+
+// -- what docs/writing-a-profile.md promises a new profile ------------------
+
+func TestEveryProfileIsListedAndEveryListedProfileExists(t *testing.T) {
+	// Registering in the map and forgetting ProfileOrder makes a profile
+	// invisible to `dagreach profiles` and to detection, with nothing to say so.
+	if len(ProfileOrder) != len(profiles) {
+		t.Errorf("ProfileOrder has %d entries, the map has %d", len(ProfileOrder), len(profiles))
+	}
+	for _, name := range ProfileOrder {
+		profile, ok := GetProfile(name)
+		if !ok {
+			t.Errorf("%s is listed but not registered", name)
+			continue
+		}
+		if profile.Name != name {
+			t.Errorf("%s is registered under the name %q", name, profile.Name)
+		}
+	}
+}
+
+func TestNoProfileClaimsAnotherProducersFile(t *testing.T) {
+	// An over-eager Detect applies the wrong edge semantics to somebody else's
+	// export, and every answer after that is inverted.
+	owners := map[string]string{
+		terraformFixture:                "terraform",
+		manifestFixture:                 "dbt",
+		sbomFixture:                     "cyclonedx",
+		"testdata/bazel.dot":            "",
+		"testdata/pipeline.jgf.json":    "",
+		"testdata/keyed_nodes.jgf.json": "",
+	}
+	for path, owner := range owners {
+		text := fixtureText(t, path)
+		for _, profile := range Profiles() {
+			if profile.Name == "generic" {
+				continue
+			}
+			if profile.Detect(text) && profile.Name != owner {
+				t.Errorf("%s claims %s, which belongs to %q", profile.Name, path, owner)
+			}
+		}
+	}
+}
+
+func TestEveryProfileNamesTheFormatItRead(t *testing.T) {
+	for path, name := range map[string]string{
+		terraformFixture: "terraform", manifestFixture: "dbt", sbomFixture: "cyclonedx",
+	} {
+		graph := load(t, path, LoadOptions{Profile: name})
+		if graph.Format == "" {
+			t.Errorf("%s left Format empty, so `parse` cannot say what it read", name)
+		}
+	}
+}
