@@ -451,3 +451,55 @@ func TestMarkdownStaysASCII(t *testing.T) {
 		}
 	}
 }
+
+func TestAnUndeterminablePolicyBlocksWithItsOwnCode(t *testing.T) {
+	path := write(t, "risky.dot", risky)
+	code, out, _ := runCLI("impact", path, "--changed", "spec",
+		"--fail-if-reaches", "attr:environment=production")
+	if code != ExitPolicyUnknown {
+		t.Fatalf("code = %d, wanted %d", code, ExitPolicyUnknown)
+	}
+	if !strings.Contains(out, "UNKNOWN fail-if-reaches attr:environment=production") ||
+		!strings.Contains(out, "cannot be settled by this file") {
+		t.Errorf("out = %q", out)
+	}
+}
+
+func TestSelectingOnAnyAttributeFromTheCommandLine(t *testing.T) {
+	path := write(t, "risky.dot", risky)
+	code, out, _ := runCLI("impact", path, "--changed", "spec",
+		"--fail-if-reaches", "attr:risk=critical", "--explain")
+	if code != ExitPolicyFailed {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(out, "FAIL fail-if-reaches attr:risk=critical") ||
+		!strings.Contains(out, "api: spec -> schema -> api") {
+		t.Errorf("out = %q", out)
+	}
+}
+
+func TestATypedSelectorKeyIsAUsageErrorNotASilentPass(t *testing.T) {
+	path := write(t, "risky.dot", risky)
+	code, _, errOut := runCLI("impact", path, "--changed", "spec", "--fail-if-reaches", "risk=critical")
+	if code != ExitUsage || !strings.Contains(errOut, "attr:risk=critical") {
+		t.Errorf("code=%d err=%q", code, errOut)
+	}
+}
+
+func TestASelectorNamingAMissingNodeIsAnInputError(t *testing.T) {
+	path := write(t, "risky.dot", risky)
+	code, _, errOut := runCLI("impact", path, "--changed", "spec", "--fail-if-reaches", "node=ap")
+	if code != ExitInputError || !strings.Contains(errOut, "no node 'ap'") ||
+		!strings.Contains(errOut, "did you mean") {
+		t.Errorf("code=%d err=%q", code, errOut)
+	}
+}
+
+func TestMarkdownCarriesTheThirdVerdict(t *testing.T) {
+	path := write(t, "risky.dot", risky)
+	_, out, _ := runCLI("impact", path, "--changed", "spec",
+		"--fail-if-reaches", "attr:environment=production", "--markdown")
+	if !strings.Contains(out, "| **UNKNOWN** | `fail-if-reaches attr:environment=production` |") {
+		t.Errorf("out = %q", out)
+	}
+}

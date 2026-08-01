@@ -40,6 +40,7 @@
       ],
       "policy": "fail-on-new-reach",
       "subject": "group=production",
+      "verdict": "fail",
       "witnesses": {
         "payments": [
           "auth",

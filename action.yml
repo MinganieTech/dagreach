@@ -144,6 +144,7 @@ runs:
 
         verdict=pass
         [ "$code" -eq 1 ] && verdict=fail
+        [ "$code" -eq 3 ] && verdict=unknown
         {
           echo "exit-code=$code"
           echo "verdict=$verdict"
@@ -153,10 +154,14 @@ runs:
         cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
         # 2 and 4 mean the run never happened; they fail here rather than be
-        # reported as a clean gate.
-        if [ "$code" -ge 2 ]; then
+        # reported as a clean gate. 3 is a verdict, not a failure to run, so it
+        # goes on to comment like the others.
+        if [ "$code" -eq 2 ] || [ "$code" -eq 4 ]; then
           echo "::error::dagreach could not run (exit $code)"
           exit "$code"
+        fi
+        if [ "$code" -eq 3 ]; then
+          echo "::warning::a dagreach policy could not be settled by this graph - see the report"
         fi
 
     - name: Comment on the pull request

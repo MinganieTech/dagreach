@@ -20,11 +20,11 @@ import (
 
 // Exit codes are part of the public contract (CI depends on them).
 const (
-	ExitOK             = 0
-	ExitPolicyFailed   = 1
-	ExitUsage          = 2
-	ExitNotImplemented = 3
-	ExitInputError     = 4
+	ExitOK            = 0
+	ExitPolicyFailed  = 1
+	ExitUsage         = 2
+	ExitPolicyUnknown = 3
+	ExitInputError    = 4
 )
 
 // DefaultLimit is how many items a text list shows before it says how many it hid.
@@ -236,6 +236,16 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 		return ExitUsage
 	}
 
+	// A selector naming a node that does not exist is a typo, not a policy that
+	// passes - the same treatment --changed already gets.
+	for _, selector := range selectors {
+		if selector.ByIdentifier() && !graph.HasNode(selector.Value) {
+			fmt.Fprintf(stderr, "dagreach: no node '%s' in %s%s\n",
+				selector.Value, graph.Source, suggest(selector.Value, graph))
+			return ExitInputError
+		}
+	}
+
 	report := Impact(graph, seeds)
 	policies := []*PolicyResult{}
 	for _, selector := range selectors {
@@ -299,7 +309,7 @@ func runDiff(parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
 	for _, selector := range selectors {
 		found := NewlyExposed(before, after, diff, selector)
 		exposures = append(exposures, found...)
-		policies = append(policies, FailOnNewReach(found, selector))
+		policies = append(policies, FailOnNewReach(found, selector, before, after))
 	}
 
 	var allPairs *AllPairsDelta
@@ -338,9 +348,15 @@ func emit(
 	}
 }
 
+// exitFor maps the gate's outcome onto the contract. UNKNOWN blocks, because a
+// policy the data cannot settle must not be indistinguishable from one it
+// satisfied - but it never claims a violation.
 func exitFor(policies []*PolicyResult) int {
-	if AnyFailed(policies) {
+	switch Outcome(policies) {
+	case VerdictFail:
 		return ExitPolicyFailed
+	case VerdictUnknown:
+		return ExitPolicyUnknown
 	}
 	return ExitOK
 }
@@ -455,8 +471,9 @@ func usage() string {
 		"",
 		"every command takes --json or --markdown; --markdown is what the GitHub Action posts",
 		"",
-		"selectors: group=VALUE, status=VALUE, node=ID",
-		"exit codes: 0 ok, 1 a policy failed, 2 usage, 4 the input could not be read",
+		"selectors: group=VALUE, status=VALUE, node=ID, attr:NAME=VALUE",
+		"exit codes: 0 ok, 1 a policy failed, 2 usage, 3 a policy could not be settled,",
+		"            4 the input could not be read",
 		"",
 	}, "\n")
 }

@@ -62,7 +62,7 @@ func TestASeedThatExistsInOnlyOneVersionIsFlagged(t *testing.T) {
 
 func TestANewEdgeIsNamedAsTheReason(t *testing.T) {
 	before, after, diff := diffOf(t, beforeDOT, afterDOT, []string{"auth"})
-	exposures := NewlyExposed(before, after, diff, Selector{"group", "production"})
+	exposures := NewlyExposed(before, after, diff, Selector{Key: "group", Value: "production"})
 	if len(exposures) != 1 {
 		t.Fatalf("exposures = %v", exposures)
 	}
@@ -79,7 +79,7 @@ func TestANewEdgeIsNamedAsTheReason(t *testing.T) {
 func TestANewNodeIsNamedAsSuch(t *testing.T) {
 	before, after, diff := diffOf(t, "digraph { auth }",
 		`digraph { auth -> secrets; secrets [group = "production"] }`, []string{"auth"})
-	exposures := NewlyExposed(before, after, diff, Selector{"group", "production"})
+	exposures := NewlyExposed(before, after, diff, Selector{Key: "group", Value: "production"})
 	if len(exposures) != 1 || exposures[0].Reason != "new-node" {
 		t.Fatalf("exposures = %v", exposures)
 	}
@@ -93,7 +93,7 @@ func TestAReclassifiedTargetIsCaughtWithoutAnyNewEdge(t *testing.T) {
 		`digraph { auth -> store; store [group = "staging"] }`,
 		`digraph { auth -> store; store [group = "production"] }`, []string{"auth"})
 	assertEqual(t, diff.Added, []string{}, "nothing new is reachable")
-	exposures := NewlyExposed(before, after, diff, Selector{"group", "production"})
+	exposures := NewlyExposed(before, after, diff, Selector{Key: "group", Value: "production"})
 	if len(exposures) != 1 || exposures[0].Reason != "reclassified" {
 		t.Fatalf("exposures = %v", exposures)
 	}
@@ -104,7 +104,7 @@ func TestAReclassifiedTargetIsCaughtWithoutAnyNewEdge(t *testing.T) {
 
 func TestNothingExposedWhenTheTargetWasAlreadyReached(t *testing.T) {
 	before, after, diff := diffOf(t, afterDOT, afterDOT, []string{"auth"})
-	if exposures := NewlyExposed(before, after, diff, Selector{"group", "production"}); len(exposures) != 0 {
+	if exposures := NewlyExposed(before, after, diff, Selector{Key: "group", Value: "production"}); len(exposures) != 0 {
 		t.Errorf("exposures = %v", exposures)
 	}
 }

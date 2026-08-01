@@ -71,6 +71,7 @@
       ],
       "policy": "fail-if-reaches",
       "subject": "group=root",
+      "verdict": "fail",
       "witnesses": {
         "pkg:npm/checkout-service@2.4.0": [
           "pkg:npm/qs@6.11.0",
@@ -86,6 +87,7 @@
       "matched": [],
       "policy": "max-impacted",
       "subject": "2",
+      "verdict": "fail",
       "witnesses": {}
     }
   ],

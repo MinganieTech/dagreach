@@ -6,14 +6,14 @@ field means, what may change without warning, and what may not.
 Every report carries `schema_version`, currently **1**.
 
 ```bash
-dagreach impact graph.dot --changed auth --json | jq '.policies[] | select(.failed)'
+dagreach impact graph.dot --changed auth --json | jq '.policies[] | select(.verdict != "pass")'
 ```
 
 ## What is promised
 
 | Promise | Detail |
 |---|---|
-| **Additive changes do not bump the version** | New keys may appear in any object, and enum-like fields (`reason`, `measure`, `policy`, `profile`) may gain values. **Ignore keys you do not know, and tolerate values you do not know.** |
+| **Additive changes do not bump the version** | New keys may appear in any object, and enum-like fields (`verdict`, `reason`, `measure`, `policy`, `profile`) may gain values. **Ignore keys you do not know, and tolerate values you do not know.** |
 | **A version bump is required** to remove or rename a key, change a value's type, change a unit or a meaning, or weaken an ordering guarantee below |
 | **Array order is deterministic** | Every list of node ids follows the order the source file declared them. Paths follow the path. `policies` follows the order the flags were given. Two runs on the same input produce byte-identical JSON. |
 | **Object keys are sorted** | so a report diffs cleanly against another |
@@ -24,7 +24,7 @@ dagreach impact graph.dot --changed auth --json | jq '.policies[] | select(.fail
 freely. Never parse them — everything a program should act on is a structured field somewhere else.
 
 Exit codes are part of the same contract and live in [policies.md](policies.md): `0` ok, `1` a
-policy failed, `2` usage, `4` unreadable input, and `3` reserved for UNKNOWN.
+policy failed, `2` usage, `3` a policy this graph cannot settle, `4` unreadable input.
 
 ## Shared shapes
 
@@ -44,7 +44,8 @@ policy failed, `2` usage, `4` unreadable input, and `3` reserved for UNKNOWN.
 |---|---|---|
 | `policy` | `string` | `fail-if-reaches`, `max-impacted`, `fail-on-cycle`, `fail-on-new-reach` |
 | `subject` | `string` | the selector or ceiling it was given |
-| `failed` | `bool` | the verdict |
+| `verdict` | `string` | `pass`, `fail`, or `unknown` — the graph could not settle it |
+| `failed` | `bool` | true only for `fail`; kept for readers written against schema 1, and equal to `verdict == "fail"` |
 | `detail` | `string` | one sentence, for humans |
 | `matched` | `[string]` | what triggered it |
 | `witnesses` | `{string: [string]}` | node id to a path proving it, for as many as the limit shows |

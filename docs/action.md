@@ -66,11 +66,11 @@ the event is not a pull request.
 
 | Output | Meaning |
 |---|---|
-| `verdict` | `pass` or `fail` |
-| `exit-code` | `0` ok, `1` a policy failed, `2` usage, `4` the input could not be read |
+| `verdict` | `pass`, `fail`, or `unknown` |
+| `exit-code` | `0` ok, `1` a policy failed, `2` usage, `3` a policy could not be settled, `4` the input could not be read |
 | `report` | path to the markdown report |
 
-## Two behaviours worth knowing
+## Three behaviours worth knowing
 
 **One comment per tag, updated in place.** A gate that stacks twenty comments on a busy pull
 request is a gate people mute. Give each job its own `comment-tag` when you run several.
@@ -78,6 +78,20 @@ request is a gate people mute. Give each job its own `comment-tag` when you run 
 **An unusable run is not a clean gate.** Exit `2` (bad usage) and `4` (unreadable input) fail the
 step loudly rather than passing quietly — the distinction the exit codes exist for. Only exit `1`
 means a policy actually failed.
+
+**UNKNOWN comments, warns, and does not fail the build.** Exit `3` means the graph could not settle
+a policy — usually a selector reading an attribute the producer does not emit. The action posts the
+report, adds a `::warning::`, and leaves the decision to you: gate on the `verdict` output when your
+project wants an unsettled policy to block.
+
+```yaml
+- uses: MinganieTech/dagreach@main
+  id: impact
+  with:
+    fail-if-reaches: attr:risk=high
+- if: steps.impact.outputs.verdict == 'unknown'
+  run: exit 1
+```
 
 ## What it does not do yet
 

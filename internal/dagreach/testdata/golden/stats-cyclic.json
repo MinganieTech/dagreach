@@ -49,6 +49,7 @@
       ],
       "policy": "fail-on-cycle",
       "subject": "cycle",
+      "verdict": "fail",
       "witnesses": {}
     }
   ],

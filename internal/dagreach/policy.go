@@ -16,28 +16,54 @@ import (
 	"strings"
 )
 
+// The three verdicts a policy can reach. A policy the data cannot settle is
+// neither satisfied nor violated, and saying "pass" in that case is the one
+// answer a gate must never give.
+const (
+	VerdictPass    = "pass"
+	VerdictFail    = "fail"
+	VerdictUnknown = "unknown"
+)
+
 // PolicyResult is the verdict of one policy, and the evidence behind it.
 type PolicyResult struct {
 	Policy    string
 	Subject   string
-	Failed    bool
+	Verdict   string
 	Detail    string
 	Matched   []string
 	Witnesses map[string][]string
 }
 
-// AnyFailed is the gate.
-func AnyFailed(results []*PolicyResult) bool {
+// Failed reports a proven violation, and only that.
+func (r *PolicyResult) Failed() bool { return r.Verdict == VerdictFail }
+
+// Unknown reports that the analysis could not settle the policy.
+func (r *PolicyResult) Unknown() bool { return r.Verdict == VerdictUnknown }
+
+// Outcome is the gate: a proven violation outranks an unsettled one, because it
+// is the stronger statement. Everything else passes.
+func Outcome(results []*PolicyResult) string {
+	outcome := VerdictPass
 	for _, result := range results {
-		if result.Failed {
-			return true
+		if result.Failed() {
+			return VerdictFail
+		}
+		if result.Unknown() {
+			outcome = VerdictUnknown
 		}
 	}
-	return false
+	return outcome
 }
+
+// AnyFailed reports whether a proven violation is among the results.
+func AnyFailed(results []*PolicyResult) bool { return Outcome(results) == VerdictFail }
 
 // FailIfReaches fails when the change reaches anything the selector matches.
 func FailIfReaches(g *Graph, report *ImpactReport, selector Selector, witnessLimit int) *PolicyResult {
+	if !selector.Declared(g) {
+		return undeterminable("fail-if-reaches", selector, g)
+	}
 	impacted := map[string]bool{}
 	for _, node := range report.Impacted() {
 		impacted[node] = true
@@ -53,6 +79,7 @@ func FailIfReaches(g *Graph, report *ImpactReport, selector Selector, witnessLim
 		return &PolicyResult{
 			Policy:  "fail-if-reaches",
 			Subject: selector.String(),
+			Verdict: VerdictPass,
 			Detail:  fmt.Sprintf("nothing matching %s is reached", selector),
 		}
 	}
@@ -87,17 +114,35 @@ func FailIfReaches(g *Graph, report *ImpactReport, selector Selector, witnessLim
 	return &PolicyResult{
 		Policy:    "fail-if-reaches",
 		Subject:   selector.String(),
-		Failed:    true,
+		Verdict:   VerdictFail,
 		Detail:    detail,
 		Matched:   matched,
 		Witnesses: witnesses,
 	}
 }
 
+// undeterminable is the verdict for a selector this graph cannot answer: the
+// attribute it reads is declared by no node, so "nothing matched" would be a
+// statement about the file rather than about the change.
+func undeterminable(policy string, selector Selector, g *Graph) *PolicyResult {
+	return &PolicyResult{
+		Policy:  policy,
+		Subject: selector.String(),
+		Verdict: VerdictUnknown,
+		Detail: fmt.Sprintf(
+			"no node in this graph declares '%s', so nothing can match %s and the policy "+
+				"cannot be settled by this file", selector.Key, selector),
+	}
+}
+
 // MaxImpacted fails when a change touches more of the graph than the team accepts.
 func MaxImpacted(report *ImpactReport, ceiling int) *PolicyResult {
 	size := len(report.Impacted())
+	verdict := VerdictPass
 	failed := size > ceiling
+	if failed {
+		verdict = VerdictFail
+	}
 	detail := fmt.Sprintf("%d node(s) impacted, within the ceiling of %d", size, ceiling)
 	if failed {
 		detail = fmt.Sprintf("%d node(s) impacted, ceiling is %d", size, ceiling)
@@ -105,7 +150,7 @@ func MaxImpacted(report *ImpactReport, ceiling int) *PolicyResult {
 	return &PolicyResult{
 		Policy:  "max-impacted",
 		Subject: strconv.Itoa(ceiling),
-		Failed:  failed,
+		Verdict: verdict,
 		Detail:  detail,
 	}
 }
@@ -114,7 +159,8 @@ func MaxImpacted(report *ImpactReport, ceiling int) *PolicyResult {
 func FailOnCycle(cycles [][]string, limit int) *PolicyResult {
 	if len(cycles) == 0 {
 		return &PolicyResult{
-			Policy: "fail-on-cycle", Subject: "cycle", Detail: "the graph is acyclic",
+			Policy: "fail-on-cycle", Subject: "cycle",
+			Verdict: VerdictPass, Detail: "the graph is acyclic",
 		}
 	}
 	shown := cycles
@@ -128,7 +174,7 @@ func FailOnCycle(cycles [][]string, limit int) *PolicyResult {
 	return &PolicyResult{
 		Policy:  "fail-on-cycle",
 		Subject: "cycle",
-		Failed:  true,
+		Verdict: VerdictFail,
 		Detail:  fmt.Sprintf("%d cycle(s) found", len(cycles)),
 		Matched: matched,
 	}
@@ -138,11 +184,15 @@ func FailOnCycle(cycles [][]string, limit int) *PolicyResult {
 // before. "Did not reach before" is judged on the pair (matches the selector, is
 // reached), so a target that was always reachable and has just been reclassified
 // counts too. See NewlyExposed.
-func FailOnNewReach(exposures []*Exposure, selector Selector) *PolicyResult {
+func FailOnNewReach(exposures []*Exposure, selector Selector, before, after *Graph) *PolicyResult {
+	if !selector.Declared(before) && !selector.Declared(after) {
+		return undeterminable("fail-on-new-reach", selector, after)
+	}
 	if len(exposures) == 0 {
 		return &PolicyResult{
 			Policy:  "fail-on-new-reach",
 			Subject: selector.String(),
+			Verdict: VerdictPass,
 			Detail:  fmt.Sprintf("nothing matching %s became reachable", selector),
 		}
 	}
@@ -157,7 +207,7 @@ func FailOnNewReach(exposures []*Exposure, selector Selector) *PolicyResult {
 	return &PolicyResult{
 		Policy:    "fail-on-new-reach",
 		Subject:   selector.String(),
-		Failed:    true,
+		Verdict:   VerdictFail,
 		Detail:    fmt.Sprintf("%d target(s) matching %s became reachable", len(exposures), selector),
 		Matched:   matched,
 		Witnesses: witnesses,

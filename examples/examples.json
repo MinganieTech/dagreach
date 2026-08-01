@@ -75,6 +75,28 @@
       ]
     },
     {
+      "name": "materialized-table",
+      "outcome": "Gate on an attribute the producer emits and dagreach never named",
+      "args": ["impact", "warehouse-manifest.json",
+               "--changed", "source.warehouse.shop.customers",
+               "--fail-if-reaches", "attr:materialized=table", "--limit", "3"],
+      "exit": 1,
+      "contains": [
+        "FAIL fail-if-reaches attr:materialized=table: 2 node(s) matching attr:materialized=table are reached",
+        "model.warehouse.fct_orders: source.warehouse.shop.customers -> model.warehouse.stg_customers -> model.warehouse.fct_orders"
+      ]
+    },
+    {
+      "name": "unsettled-policy",
+      "outcome": "Refuse to call a question answered when the graph cannot answer it",
+      "args": ["impact", "service-sbom.cdx.json", "--changed", "pkg:npm/qs@6.11.0",
+               "--fail-if-reaches", "attr:severity=critical"],
+      "exit": 3,
+      "contains": [
+        "UNKNOWN fail-if-reaches attr:severity=critical: no node in this graph declares 'severity'"
+      ]
+    },
+    {
       "name": "ceiling",
       "outcome": "Refuse a change that touches more of the graph than the team accepts",
       "args": ["impact", "warehouse-manifest.json",

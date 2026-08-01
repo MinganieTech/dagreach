@@ -113,6 +113,45 @@ policies:
 A blunt instrument, and useful exactly where blunt is right: a pull request that quietly doubles
 its own blast radius.
 
+## Gate on an attribute the producer emits and dagreach never named
+
+`group=` and `status=` are shorthands, not the vocabulary. dbt records how each model is
+materialized; nobody at dagreach decided that was interesting, and it does not have to:
+
+```bash
+dagreach impact warehouse-manifest.json \
+  --changed source.warehouse.shop.customers --fail-if-reaches attr:materialized=table
+```
+
+```text
+policies:
+  FAIL fail-if-reaches attr:materialized=table: 2 node(s) matching attr:materialized=table are reached
+    model.warehouse.fct_orders: source.warehouse.shop.customers -> model.warehouse.stg_customers -> model.warehouse.fct_orders
+```
+
+`attr:NAME=VALUE` reads any attribute a profile or a file carries — `risk`, `team`, `tier`,
+`licenses`. The prefix is required so that a typo is a usage error rather than a policy that
+matches nothing and waves the change through.
+
+## Refuse to call a question answered when the graph cannot answer it
+
+The same SBOM as above, asked a question it has no data for — this one carries licences, not
+vulnerability severities:
+
+```bash
+dagreach impact service-sbom.cdx.json --changed 'pkg:npm/qs@6.11.0' \
+  --fail-if-reaches attr:severity=critical
+```
+
+```text
+policies:
+  UNKNOWN fail-if-reaches attr:severity=critical: no node in this graph declares 'severity', so nothing can match attr:severity=critical and the policy cannot be settled by this file
+```
+
+Exit `3`, not `0`. Nothing matched, but nothing *could* have matched: reporting that as a pass would
+be a statement about the file dressed up as a statement about the change. This is the failure mode
+that quietly turns a gate into decoration, and it is worth its own exit code.
+
 ## See what the shape of a plan allows before committing to a date
 
 ```bash

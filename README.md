@@ -44,9 +44,14 @@ $ echo $?
 ```
 
 Policies are four flags, not a language — `--fail-if-reaches`, `--max-impacted`, `--fail-on cycle`,
-and the reach diff to come. Each one reports its verdict, what matched, and the path that proves
-it; the exit code is `1` when a policy fails, and never when the input was simply unreadable. See
-[docs/policies.md](docs/policies.md).
+`--fail-on-new-reach`. Each one reports its verdict, what matched, and the path that proves it; the
+exit code is `1` when a policy fails, and never when the input was simply unreadable.
+
+Selectors read one attribute: `group=production` and `status=critical` are shorthands, and
+`attr:NAME=VALUE` reaches whatever else your producer emits — `attr:risk=high`, `attr:team=payments`
+— with no re-export. When the attribute a selector names is declared by no node at all, the verdict
+is `UNKNOWN` and the exit code `3`, because "nothing matched" would be a statement about the file
+rather than about the change. See [docs/policies.md](docs/policies.md).
 
 The full report, without policies:
 
@@ -171,7 +176,8 @@ and pinned by golden files so its shape cannot drift unnoticed.
 | T6 | GitHub Action, `--markdown`, pull-request comment | done |
 | — | JSON report contract, pinned by golden files | done |
 | — | Corpus with a policy per graph, examples by outcome | done |
-| — | Selecting on any attribute, and ranking nodes by what they block | next |
+| — | Selecting on any attribute, `attr:NAME=VALUE`, and the UNKNOWN verdict | done |
+| — | Ranking nodes by what they block | next |
 | — | Profile-authoring guide | |
 | T7 | Self-contained HTML report | |
 

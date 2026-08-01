@@ -363,10 +363,7 @@ func policyLines(policies []*PolicyResult, limit int) []string {
 	}
 	lines := []string{"policies:"}
 	for _, result := range policies {
-		verdict := "ok  "
-		if result.Failed {
-			verdict = "FAIL"
-		}
+		verdict := verdictLabel(result)
 		lines = append(lines, fmt.Sprintf("  %s %s %s: %s",
 			verdict, result.Policy, result.Subject, result.Detail))
 		shown := result.Matched
@@ -385,6 +382,19 @@ func policyLines(policies []*PolicyResult, limit int) []string {
 		}
 	}
 	return lines
+}
+
+// verdictLabel spells the verdict out. FAIL and ok keep the widths they always
+// had - documentation, examples and other people's greps quote them.
+func verdictLabel(result *PolicyResult) string {
+	switch result.Verdict {
+	case VerdictFail:
+		return "FAIL"
+	case VerdictUnknown:
+		return "UNKNOWN"
+	default:
+		return "ok  "
+	}
 }
 
 func warningLines(warnings []string) []string {
@@ -424,8 +434,11 @@ func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string
 		lines = append(lines, "| verdict | policy | detail |", "| --- | --- | --- |")
 		for _, result := range policies {
 			verdict := "PASS"
-			if result.Failed {
+			switch result.Verdict {
+			case VerdictFail:
 				verdict = "**FAIL**"
+			case VerdictUnknown:
+				verdict = "**UNKNOWN**"
 			}
 			lines = append(lines, fmt.Sprintf("| %s | `%s %s` | %s |",
 				verdict, result.Policy, result.Subject, result.Detail))
@@ -433,7 +446,7 @@ func MarkdownReport(body []string, policies []*PolicyResult, limit int) []string
 		lines = append(lines, "")
 
 		for _, result := range policies {
-			if !result.Failed || len(result.Matched) == 0 {
+			if !result.Failed() || len(result.Matched) == 0 {
 				continue
 			}
 			shown := result.Matched

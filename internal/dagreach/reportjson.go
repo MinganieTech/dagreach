@@ -180,9 +180,12 @@ func policiesJSON(policies []*PolicyResult) []map[string]any {
 			witnesses = map[string][]string{}
 		}
 		documents = append(documents, map[string]any{
-			"policy":    result.Policy,
-			"subject":   result.Subject,
-			"failed":    result.Failed,
+			"policy":  result.Policy,
+			"subject": result.Subject,
+			// `failed` is kept beside `verdict` on purpose: adding a key is free
+			// under the contract, removing one is not.
+			"verdict":   result.Verdict,
+			"failed":    result.Failed(),
 			"detail":    result.Detail,
 			"matched":   matched,
 			"witnesses": witnesses,

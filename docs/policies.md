@@ -14,12 +14,15 @@ Every policy states its verdict, what matched, and the **path that proves it**. 
 | `0` | ran, and every policy passed |
 | `1` | ran, and at least one policy failed |
 | `2` | the command line was wrong (unknown flag, unreadable selector) |
+| `3` | ran, and at least one policy could not be settled by this graph |
 | `4` | the input could not be read (missing file, syntax error, unknown node) |
 
 These are a public contract: a pipeline depends on them, so changing one is a breaking change.
-(`3` once meant "declared but not implemented"; nothing is, so it is retired rather than reused.)
 Note that `2` and `4` are *not* policy failures — a broken selector must never look like a clean
-gate, and a missing file must never look like an approval.
+gate, and a missing file must never look like an approval. Neither is `3`: see
+[the third verdict](#the-third-verdict-unknown) below.
+
+A proven violation outranks an unsettled one, so a run with both exits `1`.
 
 ## The flags
 
@@ -51,10 +54,51 @@ A small grammar, not an expression language:
 | `group=VALUE` | nodes whose `group` attribute equals `VALUE` |
 | `status=VALUE` | nodes whose `status` attribute equals `VALUE` |
 | `node=ID` | one node, by exact id |
+| `attr:NAME=VALUE` | nodes whose `NAME` attribute equals `VALUE`, for any `NAME` |
 
-Anything else is a usage error (exit `2`) with the accepted keys listed. Values are matched
-exactly: no globs, no regular expressions, no substring matching. See
-[the attribute profile](attribute-profile.md) for where `group` and `status` come from.
+`group=` and `status=` are shorthands for `attr:group=` and `attr:status=`; they exist because
+[the attribute profile](attribute-profile.md) gives those two a documented meaning. Everything else
+your producer emits — `risk`, `team`, `tier`, `environment` — is reachable through `attr:`, with no
+re-export and no mapping of your vocabulary onto ours.
+
+Values are matched exactly: no globs, no regular expressions, no substring matching.
+
+The prefix is required rather than inferred, and the reason is the failure it prevents. If any
+unknown key were read as an attribute name, `--fail-if-reaches grup=production` would look for an
+attribute called `grup`, match nothing, and pass — a typo turning a gate into a rubber stamp. So a
+bare key that is not a shorthand is a usage error (exit `2`), and it names the `attr:` form you
+probably meant:
+
+```console
+$ dagreach impact services.dot --changed auth --fail-if-reaches risk=high
+dagreach: unknown selector key 'risk'; expected one of group, status, node, or attr:risk=high to read it as an attribute
+$ echo $?
+2
+```
+
+`node=ID` gets the same treatment as `--changed`: an id no node carries is a typo, so it exits `4`
+with a suggestion rather than passing quietly.
+
+## The third verdict: UNKNOWN
+
+`attr:` can name an attribute this graph knows nothing about. Reporting "nothing matched" would
+then be a statement about the *file*, not about the change — and it would read as approval. So a
+selector whose attribute **no node declares** is undeterminable:
+
+```console
+$ dagreach impact services.dot --changed auth --fail-if-reaches attr:environment=production
+policies:
+  UNKNOWN fail-if-reaches attr:environment=production: no node in this graph declares 'environment', so nothing can match attr:environment=production and the policy cannot be settled by this file
+$ echo $?
+3
+```
+
+The distinction is between the attribute being absent and the value being absent. `attr:risk=none`
+on a graph where every node declares a `risk` is a real pass: the question was asked and answered.
+`attr:environment=production` on a graph with no `environment` anywhere was never asked.
+
+A pipeline can treat `3` as it sees fit — block it like `1` while a producer is being fixed, or let
+it through with a warning — but it will never be confused with a clean gate.
 
 ## What it looks like
 
@@ -78,6 +122,7 @@ In JSON, the same thing, under `policies`:
     {
       "policy": "fail-if-reaches",
       "subject": "group=production",
+      "verdict": "fail",
       "failed": true,
       "detail": "1 node(s) matching group=production are reached",
       "matched": ["payments"],

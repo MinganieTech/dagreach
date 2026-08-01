@@ -24,10 +24,11 @@ invented at the end.
 ## What a stranger will read
 
 - [ ] `CLAUDE.md` is no longer tracked - it holds working conventions for the owner and the
-      assistant, not documentation for readers. **It stays in the history of every commit that
-      carried it.** Removing it from the past means rewriting history before the repository goes
-      public; leaving it means accepting that a determined reader finds it. Decide, do not drift.
-      Anything in it that readers *should* have belongs in `docs/` instead.
+      assistant, not documentation for readers. It remains in every commit that carried it, and the
+      decision is taken: **the history will be rewritten to remove it before the repository goes
+      public.** That is a single pass with `git filter-repo`, cheap while the repository has one
+      author and impossible to do cleanly afterwards, so it happens before the flip and not after.
+      Anything in the file that readers *should* have belongs in `docs/` instead.
 - [ ] The branches. `main` is the product; `spike/go-port` holds the Python-to-Go measurement and is
       worth keeping only if the reasoning is worth showing. Anything merged is deleted.
 - [ ] History and pull requests carry no secrets and nothing about unrelated projects. Verified
