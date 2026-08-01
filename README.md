@@ -172,6 +172,18 @@ Every command also takes `--markdown`, which is exactly what the action posts, a
 a versioned contract meant for other tools, described in [docs/json-report.md](docs/json-report.md)
 and pinned by golden files so its shape cannot drift unnoticed.
 
+### `--html` — the report that outlives the run
+
+```bash
+dagreach impact infra.dot --changed aws_vpc.main \
+  --fail-if-reaches group=aws_db_instance --explain --html > report.html
+```
+
+One standalone page: verdict, policies with the path that proves each one, then the full report. No
+scripts, no fonts, nothing fetched — and no date either, so two runs on the same input produce the
+same bytes and this week's report diffs against last week's. It is a report, not a graph explorer;
+see [docs/html-report.md](docs/html-report.md).
+
 ## Roadmap
 
 | Slice | Content | State |
@@ -188,9 +200,10 @@ and pinned by golden files so its shape cannot drift unnoticed.
 | — | Selecting on any attribute, `attr:NAME=VALUE`, and the UNKNOWN verdict | done |
 | — | Ranking nodes by what they reach, in `stats` | done |
 | — | Profile-authoring guide | done |
-| T7 | Self-contained HTML report | next |
+| T7 | Self-contained HTML report | done |
 
-Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.
+Dominators, structural linting and an HTML **explorer** are deliberately out of scope for 1.0. The
+HTML report above is a page, not a viewer: it draws no graph and runs no script.
 
 ## Install
 

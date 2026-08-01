@@ -3,8 +3,8 @@ package dagreach
 // The command line.
 //
 // Argument wiring only: reading lives in loading.go, the metrics in analysis.go
-// and reports.go, the CI decision in policy.go, and the two output shapes in
-// render.go and reportjson.go.
+// and reports.go, the CI decision in policy.go, and the output shapes in
+// render.go, reportjson.go and renderhtml.go.
 //
 // Flags may appear before or after the file arguments, because that is how the
 // documented examples read.
@@ -40,6 +40,7 @@ type options struct {
 	edgeSemantics  string
 	json           bool
 	markdown       bool
+	html           bool
 	explain        bool
 	limit          int
 	changed        []string
@@ -48,6 +49,7 @@ type options struct {
 	failOn         []string
 	maxImpacted    *int
 	allPairs       bool
+	argv           []string
 	countOnly      bool
 }
 
@@ -86,6 +88,9 @@ func Run(args []string, stdout, stderr io.Writer, stdin io.Reader) int {
 		fmt.Fprintf(stderr, "dagreach: %v\n", err)
 		return ExitUsage
 	}
+	// Kept so the HTML report can say how to produce itself again; a file
+	// outlives the terminal that made it.
+	parsed.argv = append([]string{"dagreach"}, args...)
 
 	switch command {
 	case "parse", "stats", "impact":
@@ -138,6 +143,8 @@ func parseOptions(args []string) (*options, error) {
 			parsed.json = true
 		case "--markdown":
 			parsed.markdown = true
+		case "--html":
+			parsed.html = true
 		case "--explain":
 			parsed.explain = true
 		case "--limit":
@@ -171,10 +178,38 @@ func parseOptions(args []string) (*options, error) {
 			return nil, fmt.Errorf("unknown option '%s'", name)
 		}
 	}
-	if parsed.json && parsed.markdown {
-		return nil, fmt.Errorf("--json and --markdown ask for two different outputs; pick one")
+	if chosen := outputModes(parsed); len(chosen) > 1 {
+		return nil, fmt.Errorf("%s ask for different outputs; pick one",
+			strings.Join(chosen, " and "))
 	}
 	return parsed, nil
+}
+
+// outputModes names the output flags that were asked for. They are mutually
+// exclusive, and the error has to say which two collided rather than list all
+// three at a reader who only passed one of them.
+func outputModes(parsed *options) []string {
+	chosen := []string{}
+	for _, mode := range []struct {
+		flag string
+		on   bool
+	}{{"--json", parsed.json}, {"--markdown", parsed.markdown}, {"--html", parsed.html}} {
+		if mode.on {
+			chosen = append(chosen, mode.flag)
+		}
+	}
+	return chosen
+}
+
+// inBody decides whether the text body should carry the policy block. Every mode
+// but HTML wants it there; the HTML page renders the verdicts as its own section
+// above the report, and printing the same three sentences twice on one screen is
+// how a page teaches its reader to skim.
+func inBody(parsed *options, policies []*PolicyResult) []*PolicyResult {
+	if parsed.html {
+		return nil
+	}
+	return policies
 }
 
 func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
@@ -198,7 +233,7 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 	switch command {
 	case "parse":
 		summary := Summarize(graph)
-		emit(stdout, parsed, ParseJSON(graph, summary), ParseText(graph, summary), nil)
+		emit(stdout, parsed, graph, ParseJSON(graph, summary), ParseText(graph, summary), nil)
 		return ExitOK
 	case "stats":
 		stats := Analyse(graph)
@@ -206,8 +241,8 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 		if contains(parsed.failOn, "cycle") {
 			policies = append(policies, FailOnCycle(stats.Cycles, 3))
 		}
-		emit(stdout, parsed, StatsJSON(graph, stats, policies),
-			StatsText(graph, stats, parsed.limit, policies), policies)
+		emit(stdout, parsed, graph, StatsJSON(graph, stats, policies),
+			StatsText(graph, stats, parsed.limit, inBody(parsed, policies)), policies)
 		return exitFor(policies)
 	}
 
@@ -258,8 +293,8 @@ func runSingle(command string, parsed *options, stdout, stderr io.Writer, stdin 
 		policies = append(policies, FailOnCycle(Analyse(graph).Cycles, 3))
 	}
 
-	emit(stdout, parsed, ImpactJSON(graph, report, policies, parsed.explain),
-		ImpactText(graph, report, parsed.limit, policies, parsed.explain), policies)
+	emit(stdout, parsed, graph, ImpactJSON(graph, report, policies, parsed.explain),
+		ImpactText(graph, report, parsed.limit, inBody(parsed, policies), parsed.explain), policies)
 	return exitFor(policies)
 }
 
@@ -317,16 +352,20 @@ func runDiff(parsed *options, stdout, stderr io.Writer, stdin io.Reader) int {
 		allPairs = DiffAllPairs(before, after)
 	}
 
-	emit(stdout, parsed, DiffJSON(before, after, diff, exposures, policies, allPairs),
-		DiffText(before, after, diff, exposures, policies,
+	emit(stdout, parsed, after, DiffJSON(before, after, diff, exposures, policies, allPairs),
+		DiffText(before, after, diff, exposures, inBody(parsed, policies),
 			parsed.limit, parsed.explain, allPairs, parsed.countOnly), policies)
 	return exitFor(policies)
 }
 
 // emit writes the one report the caller asked for: text for a terminal, JSON for
-// a pipeline, markdown for a pull-request comment. They state the same facts.
+// a pipeline, markdown for a pull-request comment, HTML for a file that outlives
+// both. They state the same facts.
+//
+// `subject` is the graph the report is about - the `after` graph for a diff -
+// and it is only read by the HTML page, which has a header to fill.
 func emit(
-	stdout io.Writer, parsed *options, document map[string]any,
+	stdout io.Writer, parsed *options, subject *Graph, document map[string]any,
 	lines []string, policies []*PolicyResult,
 ) {
 	switch {
@@ -339,6 +378,10 @@ func emit(
 		fmt.Fprintln(stdout, string(encoded))
 	case parsed.markdown:
 		for _, line := range MarkdownReport(lines, policies, parsed.limit) {
+			fmt.Fprintln(stdout, line)
+		}
+	case parsed.html:
+		for _, line := range HTMLReport(subject, parsed.argv, lines, policies, parsed.limit) {
 			fmt.Fprintln(stdout, line)
 		}
 	default:
@@ -469,7 +512,8 @@ func usage() string {
 		"                         [--all-pairs-reachability-delta [--count-only]] [--json]",
 		"  dagreach profiles",
 		"",
-		"every command takes --json or --markdown; --markdown is what the GitHub Action posts",
+		"output: --json for a pipeline, --markdown for a pull-request comment (what the",
+		"        GitHub Action posts), --html for a standalone file; text otherwise",
 		"",
 		"selectors: group=VALUE, status=VALUE, node=ID, attr:NAME=VALUE",
 		"exit codes: 0 ok, 1 a policy failed, 2 usage, 3 a policy could not be settled,",

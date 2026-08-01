@@ -532,3 +532,97 @@ func TestStatsSaysNothingAboutRankingWhenNothingReachesAnything(t *testing.T) {
 		t.Errorf("an edgeless graph has no ranking to report:\n%s", out)
 	}
 }
+
+// -- the HTML report -------------------------------------------------------
+
+func htmlOf(t *testing.T, args ...string) string {
+	t.Helper()
+	if !contains(args, "--html") {
+		args = append(args, "--html")
+	}
+	code, out, errOut := runCLI(args...)
+	if code == ExitUsage || code == ExitInputError {
+		t.Fatalf("code = %d: %s", code, errOut)
+	}
+	if !strings.HasPrefix(out, "<!doctype html>") {
+		t.Fatalf("not an HTML document:\n%s", out)
+	}
+	return out
+}
+
+func TestHTMLIsSelfContained(t *testing.T) {
+	out := htmlOf(t, "stats", "testdata/terraform.dot")
+	// A report that fetches anything is not an artifact you can keep, and a
+	// report that runs anything is not one you can safely open.
+	for _, forbidden := range []string{"<script", "http://", "https://", "src=", "@import", "url("} {
+		if strings.Contains(out, forbidden) {
+			t.Errorf("the page reaches outside itself: %q", forbidden)
+		}
+	}
+}
+
+func TestHTMLEscapesWhatCameFromTheFile(t *testing.T) {
+	path := write(t, "hostile.dot", `digraph { "<script>alert(1)</script>" -> "b&c" }`)
+	out := htmlOf(t, "impact", path, "--changed", "<script>alert(1)</script>")
+	if strings.Contains(out, "<script>") {
+		t.Fatal("a node identifier was written to the page as markup")
+	}
+	for _, want := range []string{"&lt;script&gt;alert(1)&lt;/script&gt;", "b&amp;c"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
+
+func TestHTMLIsByteIdenticalBetweenRuns(t *testing.T) {
+	// No date and no generated identifiers, so a report can be diffed against
+	// the last one and the difference is the graph.
+	args := []string{"impact", "testdata/terraform.dot", "--changed", "aws_vpc.main", "--html"}
+	_, first, _ := runCLI(args...)
+	_, second, _ := runCLI(args...)
+	if first != second {
+		t.Error("two runs on the same input produced different pages")
+	}
+}
+
+func TestHTMLShowsTheVerdictAndThePathThatProvesIt(t *testing.T) {
+	out := htmlOf(t, "impact", "testdata/terraform.dot", "--changed", "aws_vpc.main",
+		"--fail-if-reaches", "group=aws_instance", "--html")
+	for _, fragment := range []string{
+		`<p class="verdict fail">FAIL - at least one policy was violated.</p>`,
+		`<span class="chip fail">FAIL</span>`,
+		"aws_vpc.main &rarr; aws_security_group.web &rarr; aws_instance.web",
+	} {
+		if !strings.Contains(out, fragment) {
+			t.Errorf("missing %q in:\n%s", fragment, out)
+		}
+	}
+	if strings.Contains(out, "policies:") {
+		t.Error("the text policy block is repeated below the cards that replaced it")
+	}
+}
+
+func TestHTMLSaysWhenAPolicyCouldNotBeSettled(t *testing.T) {
+	out := htmlOf(t, "impact", "testdata/terraform.dot", "--changed", "aws_vpc.main",
+		"--fail-if-reaches", "attr:severity=critical", "--html")
+	if !strings.Contains(out, `<p class="verdict unknown">`) {
+		t.Errorf("the third verdict has no banner:\n%s", out)
+	}
+}
+
+func TestHTMLSaysHowToProduceItAgain(t *testing.T) {
+	out := htmlOf(t, "stats", "testdata/terraform.dot", "--limit", "3", "--html")
+	if !strings.Contains(out, "<code>dagreach stats testdata/terraform.dot --limit 3 --html</code>") {
+		t.Errorf("the page does not carry its own command:\n%s", out)
+	}
+}
+
+func TestTwoOutputModesAreRefusedByName(t *testing.T) {
+	code, _, errOut := runCLI("stats", "testdata/terraform.dot", "--json", "--html")
+	if code != ExitUsage {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(errOut, "--json and --html") {
+		t.Errorf("the error does not name the two that collided: %s", errOut)
+	}
+}
