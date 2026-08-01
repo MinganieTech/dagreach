@@ -7,7 +7,12 @@ name: Action smoke test
 # CLI built from the pull request, while what the action adds on top is the
 # download, the checksum and the archive format - and those differ by platform
 # (zip against tar.gz, sha256sum against shasum). This is the only place that
-# path is exercised at all, so it is run by hand after cutting a release.
+# path is exercised at all, so it is run by hand around a release.
+#
+# The ref is `main` and not an input, because `uses:` accepts no expression -
+# a GitHub limitation, not a choice. It reads the right way round anyway: this
+# proves the action.yml that is about to be tagged, against a binary that is
+# already published, so what gets tagged is what was tested.
 
 on:
   workflow_dispatch:
@@ -15,10 +20,6 @@ on:
       version:
         description: "the released tag whose binary to download, e.g. v0.1.0-rc.1"
         required: true
-      ref:
-        description: "the ref to take action.yml from; `main` tests a fix before it is tagged"
-        required: true
-        default: main
 
 permissions:
   contents: read
@@ -35,7 +36,7 @@ jobs:
 
       - name: A verdict that must fail
         id: failing
-        uses: MinganieTech/dagreach@${{ inputs.ref }}
+        uses: MinganieTech/dagreach@main
         with:
           version: ${{ inputs.version }}
           command: impact
@@ -47,7 +48,7 @@ jobs:
 
       - name: A verdict that must pass
         id: passing
-        uses: MinganieTech/dagreach@${{ inputs.ref }}
+        uses: MinganieTech/dagreach@main
         with:
           version: ${{ inputs.version }}
           command: stats
