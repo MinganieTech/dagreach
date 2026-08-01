@@ -14,14 +14,15 @@ DOT carries structure, not meaning: which way an edge points is a convention. **
 that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — and it warns rather
 than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
-> **Status: pre-alpha (0.0.1), private until it is complete and its owner has run a user
-> acceptance test.** What has to be true on the day it goes public is tracked in
-> [docs/publishing.md](docs/publishing.md).
+> **Status: `v0.1.0-rc.1`, a release candidate before 1.0.** Everything on the roadmap below is
+> built. The command line, the exit codes and the JSON report are meant to be stable — but nobody
+> outside the project has used this in anger yet, which is what a release candidate is for. Written
+> in Go and shipped as a single static binary: nothing to install alongside it.
 >
-> **Pre-alpha detail:** everything on the roadmap below is built — reading, analysis, policies, the
-> reach diff, the profiles, the CI action, and the three report formats. What is missing is a
-> release: no tag, no published binary, no external use yet. Written in Go and shipped as a single
-> static binary: nothing to install alongside it.
+> Known limits are stated rather than discovered: **it reads graphs, it does not build them**; **it
+> does not map changed files to changed nodes** — you pass node ids; **reachability is structural**,
+> so it reports what a change *can* reach and never what will execute; and **`UNKNOWN` tests
+> presence, not coverage**, so an attribute declared by only some nodes settles a policy normally.
 
 ## What works today
 
@@ -179,7 +180,7 @@ is not, they are oriented in opposite directions, so dagreach refuses and asks f
 ```yaml
 - uses: actions/checkout@v4
 - run: terraform graph > infra.dot
-- uses: ./                     # from a checkout; a published reference comes with the first release
+- uses: MinganieTech/dagreach@v0.1.0-rc.1
   with:
     command: impact
     file: infra.dot
@@ -230,14 +231,23 @@ HTML report above is a page, not a viewer: it draws no graph and runs no script.
 
 ## Install
 
-Not released yet, so there is nothing to download. From a checkout:
+```bash
+go install github.com/MinganieTech/dagreach/cmd/dagreach@v0.1.0-rc.1
+```
+
+Or take a binary from [the releases](https://github.com/MinganieTech/dagreach/releases) — Linux,
+macOS and Windows, `amd64` and `arm64`. Each archive holds one static binary with no runtime and no
+dependencies. `checksums.txt` carries the SHA-256 of every archive in a release:
+
+```bash
+sha256sum --check --ignore-missing checksums.txt
+```
+
+From a checkout, if you would rather build it:
 
 ```bash
 go build -o dagreach ./cmd/dagreach
 ```
-
-It produces one static binary with no runtime and no dependencies, which is what the first release
-will publish.
 
 ## Development
 

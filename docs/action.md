@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: terraform graph > infra.dot
-      - uses: ./          # not released yet: use it from a checkout of this repository
+      - uses: MinganieTech/dagreach@v0.1.0-rc.1
         with:
           command: impact
           file: infra.dot
@@ -60,14 +60,15 @@ the event is not a pull request.
 | `limit` | items per list in the comment, `0` for everything |
 | `comment` | post and update a pull-request comment (default `true`) |
 | `comment-tag` | identifies the comment to update |
-| `token` | needs `pull-requests: write` |
+| `version` | the released tag to download (default `v0.1.0-rc.1`) |
+| `token` | needs `pull-requests: write`, and downloads the release |
 
 ## Outputs
 
 | Output | Meaning |
 |---|---|
 | `verdict` | `pass`, `fail`, or `unknown` |
-| `commented` | `true` when the report was posted, `false` on a pull request from a fork |
+| `commented` | `true` when the report was posted; `false` otherwise, including when commenting is off, the event is not a pull request, or the head branch lives elsewhere |
 | `exit-code` | `0` ok, `1` a policy failed, `2` usage, `3` a policy could not be settled, `4` the input could not be read |
 | `report` | path to the markdown report |
 
@@ -80,11 +81,14 @@ request is a gate people mute. Give each job its own `comment-tag` when you run 
 step loudly rather than passing quietly — the distinction the exit codes exist for. Only exit `1`
 means a policy actually failed.
 
-**A pull request from a fork gets no comment, and that is not a bug.** Workflows triggered by a
-fork run with a read-only `GITHUB_TOKEN`, so posting would fail the job over a permission nobody can
-grant from the workflow. The action detects the fork, skips the comment, and says so with a
-`::notice::`; the report is still in the job summary and the verdict still gates the build. The
-`commented` output is `false` in that case.
+**A pull request whose head lives elsewhere gets no comment, and that is not a bug.** Those
+workflows run with a read-only `GITHUB_TOKEN`, so posting would fail the job over a permission
+nobody can grant from the workflow. The action compares the head repository against
+`github.repository`, skips the comment, and says so with a `::notice::`; the report is still in the
+job summary and the verdict still gates the build. The `commented` output is `false`.
+
+The test is where the head branch lives, not `head.repo.fork`: a repository that is itself a fork
+sets that flag on its own internal pull requests, where the token is writable and the comment works.
 
 Switching to `pull_request_target` would provide a writable token — and would run the workflow
 against the fork's code with the base repository's secrets. That is not a trade worth a comment.
@@ -95,7 +99,7 @@ report, adds a `::warning::`, and leaves the decision to you: gate on the `verdi
 project wants an unsettled policy to block.
 
 ```yaml
-- uses: MinganieTech/dagreach@main
+- uses: MinganieTech/dagreach@v0.1.0-rc.1
   id: impact
   with:
     fail-if-reaches: attr:risk=high
@@ -103,9 +107,16 @@ project wants an unsettled policy to block.
   run: exit 1
 ```
 
-## What it does not do yet
+## Where the binary comes from
 
-- It builds the binary from source on each run (a few seconds). Once releases are published it
-  will download one instead, and callers will pin `@v0.1.0` rather than a branch.
+The action downloads the release named by `version` and checks it against the `checksums.txt` of
+that same release, then runs it. It does not install Go and does not compile: the gate that judges
+your pull request is the artifact that was published, not one built on the spot.
+
+The checksum proves the download arrived intact. It does not prove the release is what its author
+meant to publish, since both come from the same place - pinning `version` to a tag you have looked
+at is what does that, and it is why the input has no floating default.
+
+## What it does not do yet
 - It maps changed *files* to changed *nodes* nowhere: you pass node ids. Deriving them from a diff
   is producer-specific, and doing it generically would be guessing.

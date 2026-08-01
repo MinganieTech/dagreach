@@ -6,10 +6,12 @@ invented at the end.
 
 ## Claims
 
-- [ ] **Nothing promises what does not exist.** Today the README says "not released yet, build from
-      a checkout" and the action is used as `uses: ./`. Both change the moment a release exists,
-      and not before.
-- [ ] **`Version` in `internal/dagreach/cli.go`** moves off `0.0.1` for the first tag.
+- [x] **Nothing promises what does not exist.** The README states the release candidate status and
+      the four known limits; the documented action reference is a pinned tag.
+- [x] **`Version` in `internal/dagreach/cli.go`** is `0.1.0-rc.1`, and the release workflow refuses
+      a tag that disagrees with it.
+- [ ] `.github/release-notes.md` still says "release candidate before 1.0". It is the body of every
+      release, so it is the thing to revisit when that stops being true.
 - [ ] The repository description and topics say what the tool does, in the words people search for.
 
 ## Releasing
@@ -18,15 +20,20 @@ Two thresholds, and they are not the same day. **Public** needs only the claims 
 the repository can be read, built and judged without a tag. **Released** is the promise that
 somebody can depend on it, and that is the list below.
 
-- [ ] A release workflow builds the static binary on tag for Linux, macOS and Windows, `amd64` and
-      `arm64`, and attaches them. Cross-compilation is a matrix of `GOOS`/`GOARCH`; there are no
-      dependencies to vendor.
-- [ ] SHA-256 sums published beside the binaries.
-- [ ] The action stops compiling from source and downloads the released binary instead, and the
-      documented reference becomes a pinned tag rather than a branch.
+- [x] A release workflow builds the static binary on tag for Linux, macOS and Windows, `amd64` and
+      `arm64`, and attaches them. It refuses a tag whose version disagrees with the binary, and
+      refuses to overwrite a release that already exists.
+- [x] SHA-256 sums published beside the binaries as `checksums.txt`.
+- [x] The action downloads the released binary, checks it against that release's `checksums.txt`,
+      and no longer installs Go. The documented reference is a pinned tag.
+- [ ] **The action's download path has never run.** It cannot, before a release exists: the example
+      gate now exercises the CLI from source instead. First thing to verify once the tag is cut -
+      on Linux, macOS and Windows, since the archive format and the checksum tool differ by
+      platform.
 - [ ] `go install github.com/MinganieTech/dagreach/cmd/dagreach@vX.Y.Z` is verified from a clean
       machine, since that is the path Go users will take first.
-- [ ] `SECURITY.md`: where to report, and what an answer looks like.
+- [x] `SECURITY.md`: where to report, what is in scope, and what an answer looks like. The
+      five-business-day acknowledgement is a commitment the owner has to be able to keep.
 - [ ] The first tag is `v0.1.0-rc.1`, not `v0.1.0`. A release candidate is what an external UAT is
       for, and 0.1.0 should mean somebody other than the author has run it.
 
@@ -66,11 +73,22 @@ worth trusting where it agrees with somebody who knows.
 
 ## Honest limits, stated rather than discovered
 
-The README should say plainly, before anyone has to find out:
+Said plainly in the README's status block and in the release notes, before anyone has to find out:
 
-- [ ] dagreach reads graphs; it does not build them. Producing the file is the user's job, and the
+- [x] dagreach reads graphs; it does not build them. Producing the file is the user's job, and the
       profiles cover four producers.
-- [ ] It does not map changed files to changed nodes. You pass node ids.
-- [ ] Reachability is structural: it reports what a change **can** reach, never what will execute.
-- [ ] `UNKNOWN` catches an attribute the graph never declares, not one the graph declares unevenly.
-      Stated in [policies.md](policies.md); it belongs in the README's limits too.
+- [x] It does not map changed files to changed nodes. You pass node ids.
+- [x] Reachability is structural: it reports what a change **can** reach, never what will execute.
+- [x] `UNKNOWN` catches an attribute the graph never declares, not one the graph declares unevenly.
+
+The release notes add two more, which belong to a reader choosing whether to trust a number: the
+ranking is not a dominator ranking, and the HTML report is not an explorer.
+
+## Not blocking, and worth doing anyway
+
+- [x] `CHANGELOG.md`.
+- [ ] Provenance attestations (`actions/attest-build-provenance`) and Sigstore signatures on the
+      archives. Both are one step in the release workflow, and both are worth more once anybody
+      depends on the binaries than they are today.
+- [ ] An SBOM for the released binaries - dagreach has no dependencies, so it would describe one
+      component and the Go toolchain, which is honest but thin.

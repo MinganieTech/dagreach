@@ -9,6 +9,12 @@ branding:
   color: blue
 
 inputs:
+  version:
+    description: >-
+      the released tag to run, e.g. v0.1.0-rc.1. Pin it to a tag you have looked
+      at: the checksum proves the download arrived intact, not that the release
+      is what its author meant to publish.
+    default: v0.1.0-rc.1
   command:
     description: "impact, diff, stats or parse"
     default: impact
@@ -83,14 +89,55 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: actions/setup-go@v5
-      with:
-        go-version: "1.26"
-        cache: false
-
-    - name: Build dagreach
+    # The binary is downloaded, not built: installing Go and compiling on every
+    # run costs seconds nobody asked for, and it means the gate that judged your
+    # pull request is not the artifact anyone reviewed. A pinned version and a
+    # checksum make the two the same thing.
+    - name: Fetch dagreach
       shell: bash
-      run: go build -o "$RUNNER_TEMP/dagreach" "$GITHUB_ACTION_PATH/cmd/dagreach"
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        case "$RUNNER_OS" in
+          Linux)   os=linux ;;
+          macOS)   os=darwin ;;
+          Windows) os=windows ;;
+          *) echo "::error::dagreach publishes no binary for $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64)   arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::dagreach publishes no binary for $RUNNER_ARCH"; exit 1 ;;
+        esac
+
+        stem="dagreach_${VERSION#v}_${os}_${arch}"
+        if [ "$os" = "windows" ]; then archive="$stem.zip"; else archive="$stem.tar.gz"; fi
+
+        cd "$RUNNER_TEMP"
+        gh release download "$VERSION" --repo MinganieTech/dagreach \
+          --pattern "$archive" --pattern checksums.txt --clobber
+
+        # The checksum comes from the same release, so it proves the download
+        # arrived intact - not that the release is what its author meant to
+        # publish. Pinning `version` to a tag you have looked at is what does
+        # that, and it is why this input has no floating default.
+        if command -v sha256sum > /dev/null; then
+          grep " \*\?$archive\$" checksums.txt | sha256sum --check --strict -
+        else
+          shasum -a 256 --check --strict <(grep " \*\?$archive\$" checksums.txt)
+        fi
+
+        binary="dagreach"
+        case "$archive" in
+          *.zip) unzip -oq "$archive"; binary="dagreach.exe" ;;
+          *)     tar -xzf "$archive"; chmod +x dagreach ;;
+        esac
+        # Windows keeps its extension rather than being renamed, so the later
+        # step is told where the binary is instead of guessing.
+        echo "DAGREACH_BIN=$RUNNER_TEMP/$binary" >> "$GITHUB_ENV"
+        "$RUNNER_TEMP/$binary" --version
 
     - name: Run dagreach
       id: run
@@ -145,7 +192,7 @@ runs:
         # `shell: bash` runs with -e, and a failing policy is exit 1 on purpose:
         # without this the step would die here and never comment.
         set +e
-        "$RUNNER_TEMP/dagreach" "${args[@]}" --markdown > "$report"
+        "$DAGREACH_BIN" "${args[@]}" --markdown > "$report"
         code=$?
         set -e
         cat "$report"

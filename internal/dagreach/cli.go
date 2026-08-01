@@ -30,8 +30,9 @@ const (
 // DefaultLimit is how many items a text list shows before it says how many it hid.
 const DefaultLimit = 10
 
-// Version is stamped by the build; it has one home.
-const Version = "0.0.1"
+// Version is the release this build claims to be. It has one home, and the
+// release workflow refuses a tag that disagrees with it.
+const Version = "0.1.0-rc.1"
 
 type options struct {
 	positional     []string

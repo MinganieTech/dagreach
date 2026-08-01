@@ -1,58 +1,58 @@
 name: Example gate
 
-# Exercises the action end to end on every pull request, against the fixtures
-# in this repository. It is a demonstration and a test at once: if the action
-# stops working, this is where it shows.
+# Exercises the gate end to end on every pull request, against the fixtures in
+# this repository: three real questions, two of them meant to fail.
+#
+# It runs the binary built from the pull request rather than the action, because
+# the action now downloads a published release - so pointing this at the action
+# would judge a pull request with a binary that predates it, and would fail
+# outright until a release exists. What the action adds on top of the commands
+# below is the download, the checksum and the comment; that path can only be
+# tested against a real release, and doing so is a step in docs/publishing.md.
 
 on:
   pull_request:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
-  supply-chain:
-    name: Does a vulnerable package reach the product?
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./
+      - uses: actions/setup-go@v5
         with:
-          command: impact
-          file: internal/dagreach/testdata/sbom.cdx.json
-          changed: pkg:npm/qs@6.11.0
-          fail-if-reaches: group=root
-          comment-tag: supply-chain
-        # This one is meant to fail: it is what a real blocking verdict looks
-        # like, and the comment it posts is the point of the demonstration.
-        continue-on-error: true
+          go-version: "1.26"
+          check-latest: true
+      - run: go build -o "$RUNNER_TEMP/dagreach" ./cmd/dagreach
 
-  data-lineage:
-    name: What does a changed source reach downstream?
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          command: impact
-          file: internal/dagreach/testdata/dbt-manifest.json
-          changed: source.acme_analytics.shop.orders
-          max-impacted: "100"
-          comment-tag: data-lineage
+      - name: Does a vulnerable package reach the product?
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/dagreach" impact internal/dagreach/testdata/sbom.cdx.json \
+            --changed 'pkg:npm/qs@6.11.0' --fail-if-reaches group=root --markdown \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          code=${PIPESTATUS[0]}
+          # Meant to fail: this is what a real blocking verdict looks like.
+          [ "$code" -eq 1 ] || { echo "::error::expected exit 1, got $code"; exit 1; }
 
-  new-route:
-    name: Did this change open a new route to production?
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./
-        with:
-          command: diff
-          before: internal/dagreach/testdata/gate-before.dot
-          after: internal/dagreach/testdata/gate-after.dot
-          changed: auth
-          fail-on-new-reach: group=production
-          comment-tag: new-route
-        # Also meant to fail: one added edge, and auth now reaches payments.
-        continue-on-error: true
+      - name: What does a changed source reach downstream?
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/dagreach" impact internal/dagreach/testdata/dbt-manifest.json \
+            --changed source.acme_analytics.shop.orders --max-impacted 100 --markdown \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Did this change open a new route to production?
+        shell: bash
+        run: |
+          set +e
+          "$RUNNER_TEMP/dagreach" diff internal/dagreach/testdata/gate-before.dot \
+            internal/dagreach/testdata/gate-after.dot \
+            --changed auth --fail-on-new-reach group=production --markdown \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          code=${PIPESTATUS[0]}
+          # Also meant to fail: one added edge, and auth now reaches payments.
+          [ "$code" -eq 1 ] || { echo "::error::expected exit 1, got $code"; exit 1; }
