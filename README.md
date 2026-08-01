@@ -166,7 +166,7 @@ and pinned by golden files so its shape cannot drift unnoticed.
 | T5 | Profiles: Terraform, dbt, CycloneDX, generic | done |
 | T6 | GitHub Action, `--markdown`, pull-request comment | done |
 | T6.1 | PASS / FAIL / UNKNOWN verdict qualification | waits for T6.2, which produces the first UNKNOWN |
-| T6.2 | Experimental GitHub Actions profile (see [the decisions](docs/decisions-ci-yaml.md)) | |
+| T6.2 | GitHub Actions profile | [no-go as specified, measured](docs/decisions-ci-yaml.md) |
 | — | JSON report contract, pinned by golden files | done |
 | — | Corpus with a policy per graph, examples by outcome | next |
 | — | Profile-authoring guide | |

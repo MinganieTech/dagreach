@@ -1,7 +1,8 @@
 # A GitHub Actions structural dependency profile
 
-**Status: decided in principle, not implemented.** Nothing is in `go.mod`, no profile exists, and
-this lands after T6. The page exists so the decisions can be judged before any code.
+**Status: measured against 228 real workflows, and the answer is no-go as specified.** Nothing is
+in `go.mod`, no profile exists, and the measurement below is the deliverable. The design decisions
+are kept because they remain right; the reason to build them is what the data removed.
 
 The feature is **not** "YAML support". It is one producer's conventions, read from a file that
 happens to be YAML.
@@ -26,7 +27,7 @@ home-made YAML graph can emit JGF or DOT in twenty lines and get every guarantee
 | Feature | Decision |
 |---|---|
 | YAML as a generic format | **No** |
-| GitHub Actions profile | **Yes, experimental** |
+| GitHub Actions profile | **Re-scoped after measurement — see the verdict below** |
 | Raw `.gitlab-ci.yml` profile | Not now |
 | Profile for a *resolved* GitLab export | To prototype |
 | Network resolution of includes | **No** |
@@ -45,7 +46,9 @@ It answers:
 - and with `diff`: *did this workflow change just open a new route to production?*
 
 That is CI/CD blast radius and supply-chain reasoning, which is worth having, as long as it is
-described as what it is.
+described as what it is. **The measurement below shows the second question is the one real files
+cannot answer** — deployment environments are rarely declared and usually dynamic — and points at
+what they can.
 
 ## The graph contract
 
@@ -191,6 +194,82 @@ deploy:
 the edge `build -> deploy` exists structurally, while no single run satisfies both conditions. The
 result is a cautious over-approximation. **For a security gate that false positive is acceptable; a
 false PASS is not.**
+
+## What the measurement found
+
+Run on **228 workflows from 23 public repositories** — Grafana, Prometheus, Terraform, dbt, the
+GitHub CLI, Next.js, pandas, Home Assistant, Compose, Argo CD, Flux, Cilium, cosign, GoReleaser,
+syft, Trivy, Dagger, the OpenTelemetry collector, Kustomize, Elasticsearch, Airflow, CPython,
+Rust — holding **583 jobs**. A mixed sample chosen before the numbers were known, not one picked
+to suit the answer.
+
+| Question | Measured |
+|---|---|
+| jobs that call a reusable workflow | **21%** (122/583), in 16 of 23 repositories |
+| jobs declaring `needs` | **37%** (218/583), 481 declared edges |
+| workflows with any `needs` at all | **21%** (48/228) |
+| **workflows that are a single job** | **66%** (150/228) |
+| jobs carrying an `if:` condition | **55%** (320/583) |
+| **jobs declaring an `environment`** | **3%** (20/583) |
+| of those, a dynamic expression | **55%** (11/20) |
+
+### Criterion 1 and 2: survived
+
+Reusable workflows are common enough to matter — one job in five is opaque — but they do not make
+the answer routinely partial. They do make **UNKNOWN mandatory rather than optional**: a policy
+that ignores a fifth of the jobs would be guessing, which is the failure this profile exists to
+avoid.
+
+### Criterion 3: the headline use case does not survive
+
+The flagship query this whole design was built around —
+
+```bash
+dagreach impact ci.yml --changed build --fail-if-reaches group=production
+```
+
+— rests on jobs declaring `environment:`. **Three percent do, and more than half of those are
+expressions** (`${{ inputs.environment }}`, `${{ needs.init.outputs.channel }}`). A statically
+identifiable production environment exists on roughly **one job in seventy**. The question the
+profile was supposed to answer is, in practice, barely answerable.
+
+Two further numbers resize the rest of the promise: **two thirds of workflows are a single job**,
+so there is no graph to analyse at all, and **55% of jobs carry an `if:`**, so the structural
+over-approximation is not a corner case but the norm.
+
+### What is actually there
+
+The same sample says the value sits elsewhere:
+
+| Signal | Measured |
+|---|---|
+| jobs declaring a **write permission** | **26%** (149/583) |
+| jobs passing **`secrets: inherit`** | **7%** (43/583) — every one of them an opaque reusable call |
+| jobs named deploy/release/publish/push | 10% (58/583) |
+| the workflows that *do* have a graph | 48 workflows, 302 jobs |
+
+That is a supply-chain question, not a deployment one: *can a change to this job reach a job that
+holds write permissions, or that hands its secrets to a workflow we cannot see?* Forty-three jobs
+in this sample inherit secrets into an opaque call — and that is exactly where an UNKNOWN verdict
+earns its place.
+
+## Verdict
+
+**No-go for the profile as specified.** `group=production` was the reason to build it, and the data
+does not support it.
+
+**Conditional go for a re-scoped one**, if it is built at all:
+
+- gate on `permissions` and `secrets: inherit` rather than on `environment`, since those are
+  declared, static, and present on 26% and 7% of jobs;
+- keep `environment` as an attribute, never as a group when it is an expression;
+- state plainly that two thirds of workflows have no graph, so the profile answers "nothing
+  downstream" for most files and earns its keep on release pipelines;
+- ship UNKNOWN with it, because a fifth of jobs are opaque.
+
+It also stays where the priority list put it: **after** the profile-authoring guide, which lets
+someone else write this profile — and after the HTML report. The measurement is the deliverable
+here; the code is not owed.
 
 ## Why raw GitLab is deferred
 
