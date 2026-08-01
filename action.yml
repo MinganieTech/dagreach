@@ -177,8 +177,17 @@ runs:
         [ -n "$INPUT_FORMAT" ] && args+=(--format "$INPUT_FORMAT")
         [ -n "$INPUT_MAX_IMPACTED" ] && args+=(--max-impacted "$INPUT_MAX_IMPACTED")
         [ -n "$INPUT_FAIL_ON" ] && args+=(--fail-on "$INPUT_FAIL_ON")
-        [ "$INPUT_EXPLAIN" = "true" ] && [ "$INPUT_COMMAND" != "parse" ] && args+=(--explain)
-        [ "$INPUT_COMMAND" != "parse" ] && args+=(--limit "$INPUT_LIMIT")
+        # Only the two commands that reach something read --explain; passing it
+        # to `stats` used to be dropped in silence and is now a usage error, so
+        # the action has to know which commands read which flag. `parse` reads
+        # neither: it reports what loaded, and there is nothing to limit.
+        case "$INPUT_COMMAND" in
+          impact|diff)
+            [ "$INPUT_EXPLAIN" = "true" ] && args+=(--explain)
+            args+=(--limit "$INPUT_LIMIT") ;;
+          stats)
+            args+=(--limit "$INPUT_LIMIT") ;;
+        esac
 
         while IFS= read -r selector; do
           [ -n "$selector" ] && args+=(--fail-if-reaches "$selector")

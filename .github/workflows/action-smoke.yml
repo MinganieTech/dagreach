@@ -13,8 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "the released tag to test, e.g. v0.1.0-rc.1"
+        description: "the released tag whose binary to download, e.g. v0.1.0-rc.1"
         required: true
+      ref:
+        description: "the ref to take action.yml from; `main` tests a fix before it is tagged"
+        required: true
+        default: main
 
 permissions:
   contents: read
@@ -31,7 +35,7 @@ jobs:
 
       - name: A verdict that must fail
         id: failing
-        uses: MinganieTech/dagreach@v0.1.0-rc.1
+        uses: MinganieTech/dagreach@${{ inputs.ref }}
         with:
           version: ${{ inputs.version }}
           command: impact
@@ -43,7 +47,7 @@ jobs:
 
       - name: A verdict that must pass
         id: passing
-        uses: MinganieTech/dagreach@v0.1.0-rc.1
+        uses: MinganieTech/dagreach@${{ inputs.ref }}
         with:
           version: ${{ inputs.version }}
           command: stats
