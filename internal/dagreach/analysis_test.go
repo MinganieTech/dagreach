@@ -247,3 +247,86 @@ func TestDeepGraphsDoNotOverflowTheStack(t *testing.T) {
 			len(stats.ArticulationPoints))
 	}
 }
+
+// -- the ranking -----------------------------------------------------------
+
+func rankingOf(t *testing.T, text string) []NodeReach {
+	t.Helper()
+	return ReachRanking(mustParseDOT(t, text))
+}
+
+func TestRankingOrdersByWhatEachNodeReaches(t *testing.T) {
+	ranking := rankingOf(t, diamond)
+	want := []NodeReach{{"a", 3}, {"b", 1}, {"c", 1}}
+	if len(ranking) != len(want) {
+		t.Fatalf("ranking = %v", ranking)
+	}
+	for index, entry := range ranking {
+		if entry != want[index] {
+			t.Errorf("entry %d = %v, wanted %v", index, entry, want[index])
+		}
+	}
+}
+
+func TestRankingLeavesOutTheNodesThatReachNothing(t *testing.T) {
+	for _, entry := range rankingOf(t, diamond) {
+		if entry.Node == "d" {
+			t.Error("d is a leaf: it reaches nothing and belongs nowhere in a ranking")
+		}
+	}
+	if ranking := rankingOf(t, "digraph { a; b }"); len(ranking) != 0 {
+		t.Errorf("ranking = %v, an edgeless graph has no ranking at all", ranking)
+	}
+}
+
+func TestRankingBreaksTiesInDeclarationOrder(t *testing.T) {
+	ranking := rankingOf(t, "digraph { second -> x; first -> y }")
+	if ranking[0].Node != "second" || ranking[1].Node != "first" {
+		t.Errorf("ranking = %v, ties follow the file rather than the alphabet", ranking)
+	}
+}
+
+func TestInsideACycleEveryNodeHoldsUpItself(t *testing.T) {
+	ranking := rankingOf(t, "digraph { a -> b -> a; b -> c }")
+	// a and b reach a, b and c: the two of them plus c, themselves included,
+	// because a cycle really does hold its own members up.
+	if ranking[0].Reaches != 3 || ranking[1].Reaches != 3 {
+		t.Fatalf("ranking = %v", ranking)
+	}
+	if ranking[0].Node != "a" || ranking[1].Node != "b" {
+		t.Errorf("ranking = %v", ranking)
+	}
+}
+
+func TestRankingFollowsTheEdgeSemantics(t *testing.T) {
+	// Under depends-on the arrows are reversed once at load, so the ranking
+	// answers "what breaks when this breaks" rather than "what does this need".
+	graph := mustParseDOT(t, "digraph { app -> library }")
+	Orient(graph, "depends-on")
+	ranking := ReachRanking(graph)
+	if len(ranking) != 1 || ranking[0].Node != "library" {
+		t.Errorf("ranking = %v, the library is what holds the application up", ranking)
+	}
+}
+
+func TestTheRankingIsSkippedOnAGraphTooLargeToClose(t *testing.T) {
+	var built strings.Builder
+	built.WriteString("digraph { n0 -> n1;")
+	for index := 2; index <= RankingCeiling; index++ {
+		fmt.Fprintf(&built, "n%d;", index)
+	}
+	built.WriteString(" }")
+
+	stats := Analyse(mustParseDOT(t, built.String()))
+	if stats.Nodes <= RankingCeiling {
+		t.Fatalf("nodes = %d, the graph must be over the ceiling for this to test anything",
+			stats.Nodes)
+	}
+	if !stats.RankingSkipped || len(stats.Ranking) != 0 {
+		t.Errorf("skipped=%v ranking=%v", stats.RankingSkipped, stats.Ranking)
+	}
+	// Skipped is not the same as empty, and the JSON has to keep them apart.
+	if StatsJSON(mustParseDOT(t, built.String()), stats, nil)["most_reaching"] != nil {
+		t.Error("a ranking that was never measured is null, not []")
+	}
+}

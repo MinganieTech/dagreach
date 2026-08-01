@@ -503,3 +503,32 @@ func TestMarkdownCarriesTheThirdVerdict(t *testing.T) {
 		t.Errorf("out = %q", out)
 	}
 }
+
+func TestStatsRanksTheNodesWithTheMostBehindThem(t *testing.T) {
+	path := write(t, "spine.dot", "digraph { a -> b -> c -> d; b -> e }")
+	code, out, _ := runCLI("stats", path, "--limit", "2")
+	if code != ExitOK {
+		t.Fatalf("code = %d", code)
+	}
+	for _, fragment := range []string{
+		"most reaching (3 of 5 nodes reach anything):",
+		"  a reaches 4 (80%)",
+		"  b reaches 3 (60%)",
+		"  (+1 more)",
+	} {
+		if !strings.Contains(out, fragment) {
+			t.Errorf("missing %q in:\n%s", fragment, out)
+		}
+	}
+	if strings.Contains(out, "c reaches") {
+		t.Error("--limit 2 shows two entries")
+	}
+}
+
+func TestStatsSaysNothingAboutRankingWhenNothingReachesAnything(t *testing.T) {
+	path := write(t, "dust.dot", "digraph { a; b }")
+	_, out, _ := runCLI("stats", path)
+	if strings.Contains(out, "most reaching") {
+		t.Errorf("an edgeless graph has no ranking to report:\n%s", out)
+	}
+}

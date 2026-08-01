@@ -77,6 +77,7 @@ Adds to the identity fields above:
 | `widest_generation` | `[string]` | the nodes of that generation |
 | `roots`, `leaves`, `isolated` | `[string]` | |
 | `articulation_points` | `[string]` | undirected reading — see [metrics.md](metrics.md) |
+| `most_reaching` | `[object]\|null` | every node reaching at least one other, largest first; `{node, reaches, share}`. **`null` means the ranking was not measured** — the graph is over the 25 000-node ceiling — while `[]` means it was measured and nothing reaches anything. |
 | `longest_path` | object\|null | |
 | `groups` | `{string: int}` | |
 

@@ -22,8 +22,6 @@ package dagreach
 import (
 	"fmt"
 	"math/big"
-	"math/bits"
-	"sort"
 )
 
 // Reasons a target is newly exposed. The three are exhaustive: a target reached
@@ -290,94 +288,4 @@ func DiffAllPairs(before, after *Graph) *AllPairsDelta {
 		}
 	}
 	return delta
-}
-
-func bitCount(value *big.Int) int {
-	count := 0
-	for _, word := range value.Bits() {
-		count += bits.OnesCount(uint(word))
-	}
-	return count
-}
-
-// reachableBitsets gives one bitset per node: everything it reaches, itself excluded
-// unless it sits in a cycle.
-func reachableBitsets(g *Graph, bitOf map[string]int) map[string]*big.Int {
-	working, memberOf := g, map[string]string{}
-	for _, node := range g.Nodes() {
-		memberOf[node] = node
-	}
-	adjacency := BuildAdjacency(g)
-	if len(Cycles(g, adjacency)) > 0 {
-		working, memberOf = Condense(g, adjacency)
-		adjacency = BuildAdjacency(working)
-	}
-
-	members := map[string][]string{}
-	for _, node := range g.Nodes() {
-		component := memberOf[node]
-		members[component] = append(members[component], node)
-	}
-
-	order := reverseTopologicalOrder(working, adjacency)
-	reachOf := map[string]*big.Int{}
-	for _, node := range order {
-		bits := new(big.Int)
-		for _, successor := range adjacency.Successors[node] {
-			bits.Or(bits, reachOf[successor])
-			for _, member := range members[successor] {
-				bits.SetBit(bits, bitOf[member], 1)
-			}
-		}
-		reachOf[node] = bits
-	}
-
-	expanded := map[string]*big.Int{}
-	componentNames := make([]string, 0, len(members))
-	for name := range members {
-		componentNames = append(componentNames, name)
-	}
-	sort.Strings(componentNames)
-	for _, component := range componentNames {
-		componentMembers := members[component]
-		bits := new(big.Int).Set(reachOf[component])
-		if len(componentMembers) > 1 {
-			// Inside a cycle everything reaches everything, itself included.
-			for _, member := range componentMembers {
-				bits.SetBit(bits, bitOf[member], 1)
-			}
-		}
-		for _, member := range componentMembers {
-			expanded[member] = bits
-		}
-	}
-	return expanded
-}
-
-func reverseTopologicalOrder(g *Graph, adjacency *Adjacency) []string {
-	remaining := map[string]int{}
-	for _, node := range g.Nodes() {
-		remaining[node] = len(adjacency.Successors[node])
-	}
-	order := []string{}
-	frontier := []string{}
-	for _, node := range g.Nodes() {
-		if remaining[node] == 0 {
-			frontier = append(frontier, node)
-		}
-	}
-	for len(frontier) > 0 {
-		next := []string{}
-		for _, node := range frontier {
-			order = append(order, node)
-			for _, predecessor := range adjacency.Predecessors[node] {
-				remaining[predecessor]--
-				if remaining[predecessor] == 0 {
-					next = append(next, predecessor)
-				}
-			}
-		}
-		frontier = next
-	}
-	return order
 }

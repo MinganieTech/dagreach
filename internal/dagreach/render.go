@@ -166,6 +166,7 @@ func StatsText(g *Graph, stats *GraphStats, limit int, policies []*PolicyResult)
 
 	lines = append(lines, fmt.Sprintf("articulation points (%d, undirected reading): %s",
 		len(stats.ArticulationPoints), Listing(stats.ArticulationPoints, limit)))
+	lines = append(lines, rankingLines(stats, limit)...)
 	if len(stats.Isolated) > 0 {
 		lines = append(lines, fmt.Sprintf("isolated (%d): %s",
 			len(stats.Isolated), Listing(stats.Isolated, limit)))
@@ -176,6 +177,35 @@ func StatsText(g *Graph, stats *GraphStats, limit int, policies []*PolicyResult)
 
 	lines = append(lines, policyLines(policies, limit)...)
 	return append(lines, warningLines(g.Warnings)...)
+}
+
+// rankingLines lists the nodes with the most behind them. Ordered largest
+// first, so the lines that matter are the ones the reader sees before the block
+// is cut off by the limit.
+func rankingLines(stats *GraphStats, limit int) []string {
+	if stats.RankingSkipped {
+		return []string{fmt.Sprintf(
+			"most reaching: not measured, %d nodes is over the ceiling of %d "+
+				"(it holds one reachable set per node)", stats.Nodes, RankingCeiling)}
+	}
+	if len(stats.Ranking) == 0 {
+		return nil
+	}
+	shown := stats.Ranking
+	if limit > 0 && len(shown) > limit {
+		shown = shown[:limit]
+	}
+	lines := []string{fmt.Sprintf("most reaching (%d of %d nodes reach anything):",
+		len(stats.Ranking), stats.Nodes)}
+	for _, entry := range shown {
+		lines = append(lines, fmt.Sprintf("  %s reaches %d (%d%%)",
+			entry.Node, entry.Reaches,
+			int(roundTo(float64(entry.Reaches)/float64(stats.Nodes)*100, 0))))
+	}
+	if len(stats.Ranking) > len(shown) {
+		lines = append(lines, fmt.Sprintf("  (+%d more)", len(stats.Ranking)-len(shown)))
+	}
+	return lines
 }
 
 // -- impact ----------------------------------------------------------------

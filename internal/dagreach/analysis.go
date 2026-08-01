@@ -15,6 +15,8 @@ package dagreach
 import (
 	"fmt"
 	"math"
+	"math/big"
+	"math/bits"
 	"sort"
 	"strconv"
 )
@@ -620,4 +622,141 @@ func formatNumber(value float64) string {
 		return strconv.FormatInt(int64(value), 10)
 	}
 	return strconv.FormatFloat(value, 'g', -1, 64)
+}
+
+// -- reachable sets --------------------------------------------------------
+//
+// Reachability for every node at once, as one bitset per node built in reverse
+// topological order: each node unions what its successors reach. That is the
+// only shape in which "what does each node reach" stays proportional to the
+// edges rather than to the pairs.
+
+func bitCount(value *big.Int) int {
+	count := 0
+	for _, word := range value.Bits() {
+		count += bits.OnesCount(uint(word))
+	}
+	return count
+}
+
+// reachableBitsets gives one bitset per node: everything it reaches, itself excluded
+// unless it sits in a cycle.
+func reachableBitsets(g *Graph, bitOf map[string]int) map[string]*big.Int {
+	working, memberOf := g, map[string]string{}
+	for _, node := range g.Nodes() {
+		memberOf[node] = node
+	}
+	adjacency := BuildAdjacency(g)
+	if len(Cycles(g, adjacency)) > 0 {
+		working, memberOf = Condense(g, adjacency)
+		adjacency = BuildAdjacency(working)
+	}
+
+	members := map[string][]string{}
+	for _, node := range g.Nodes() {
+		component := memberOf[node]
+		members[component] = append(members[component], node)
+	}
+
+	order := reverseTopologicalOrder(working, adjacency)
+	reachOf := map[string]*big.Int{}
+	for _, node := range order {
+		bits := new(big.Int)
+		for _, successor := range adjacency.Successors[node] {
+			bits.Or(bits, reachOf[successor])
+			for _, member := range members[successor] {
+				bits.SetBit(bits, bitOf[member], 1)
+			}
+		}
+		reachOf[node] = bits
+	}
+
+	expanded := map[string]*big.Int{}
+	componentNames := make([]string, 0, len(members))
+	for name := range members {
+		componentNames = append(componentNames, name)
+	}
+	sort.Strings(componentNames)
+	for _, component := range componentNames {
+		componentMembers := members[component]
+		bits := new(big.Int).Set(reachOf[component])
+		if len(componentMembers) > 1 {
+			// Inside a cycle everything reaches everything, itself included.
+			for _, member := range componentMembers {
+				bits.SetBit(bits, bitOf[member], 1)
+			}
+		}
+		for _, member := range componentMembers {
+			expanded[member] = bits
+		}
+	}
+	return expanded
+}
+
+func reverseTopologicalOrder(g *Graph, adjacency *Adjacency) []string {
+	remaining := map[string]int{}
+	for _, node := range g.Nodes() {
+		remaining[node] = len(adjacency.Successors[node])
+	}
+	order := []string{}
+	frontier := []string{}
+	for _, node := range g.Nodes() {
+		if remaining[node] == 0 {
+			frontier = append(frontier, node)
+		}
+	}
+	for len(frontier) > 0 {
+		next := []string{}
+		for _, node := range frontier {
+			order = append(order, node)
+			for _, predecessor := range adjacency.Predecessors[node] {
+				remaining[predecessor]--
+				if remaining[predecessor] == 0 {
+					next = append(next, predecessor)
+				}
+			}
+		}
+		frontier = next
+	}
+	return order
+}
+
+// RankingCeiling is the largest graph the ranking is measured on. See Analyse.
+const RankingCeiling = 25000
+
+// NodeReach is one node and the size of what it reaches.
+type NodeReach struct {
+	Node    string
+	Reaches int
+}
+
+// ReachRanking orders every node by how much of the graph it reaches, largest
+// first, ties in declaration order.
+//
+// This is the question the other metrics circle without answering. Articulation
+// points name the nodes a graph cannot route around, but not how much sits
+// behind them; roots name where work starts, not what waits on it. Under
+// `depends-on` semantics the ranking reads as what breaks when a node breaks;
+// under `feeds`, as what waits when a node is late.
+//
+// A node does not count itself, so a leaf reaches 0 - except inside a cycle,
+// where everything reaches everything and a node genuinely does hold itself up.
+// Nodes reaching nothing are left out: a ranking of zeroes is not a ranking.
+func ReachRanking(g *Graph) []NodeReach {
+	bitOf := make(map[string]int, g.NodeCount())
+	for index, node := range g.Nodes() {
+		bitOf[node] = index
+	}
+	sets := reachableBitsets(g, bitOf)
+
+	ranking := make([]NodeReach, 0, g.NodeCount())
+	for _, node := range g.Nodes() {
+		if count := bitCount(sets[node]); count > 0 {
+			ranking = append(ranking, NodeReach{Node: node, Reaches: count})
+		}
+	}
+	sort.SliceStable(ranking, func(a, b int) bool {
+		return ranking[a].Reaches > ranking[b].Reaches
+	})
+	return ranking
 }

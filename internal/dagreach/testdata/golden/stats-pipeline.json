@@ -30,6 +30,28 @@
     ],
     "weighted": true
   },
+  "most_reaching": [
+    {
+      "node": "extract_orders",
+      "reaches": 3,
+      "share": 0.6
+    },
+    {
+      "node": "extract_customers",
+      "reaches": 3,
+      "share": 0.6
+    },
+    {
+      "node": "transform_orders",
+      "reaches": 2,
+      "share": 0.4
+    },
+    {
+      "node": "load_warehouse",
+      "reaches": 1,
+      "share": 0.2
+    }
+  ],
   "nodes": 5,
   "policies": [],
   "profile": "generic",

@@ -39,6 +39,23 @@
     ],
     "weighted": true
   },
+  "most_reaching": [
+    {
+      "node": "build",
+      "reaches": 4,
+      "share": 1
+    },
+    {
+      "node": "test",
+      "reaches": 4,
+      "share": 1
+    },
+    {
+      "node": "lint",
+      "reaches": 1,
+      "share": 0.25
+    }
+  ],
   "nodes": 4,
   "policies": [
     {

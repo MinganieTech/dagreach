@@ -152,6 +152,33 @@ Exit `3`, not `0`. Nothing matched, but nothing *could* have matched: reporting 
 be a statement about the file dressed up as a statement about the change. This is the failure mode
 that quietly turns a gate into decoration, and it is worth its own exit code.
 
+## Know what to be careful with, before knowing what to ask about
+
+Every question above starts by naming a node. This one does not: it ranks every node by how much of
+the graph sits behind it.
+
+```bash
+dagreach stats service-sbom.cdx.json --limit 3
+```
+
+```text
+edges: cyclonedx profile, source depends on target, so impact follows edges backward
+most reaching (5 of 7 nodes reach anything):
+  pkg:npm/qs@6.11.0 reaches 4 (57%)
+  pkg:npm/body-parser@1.20.2 reaches 2 (29%)
+  pkg:npm/sonic-boom@4.0.1 reaches 2 (29%)
+  (+2 more)
+```
+
+Read with the orientation on the second line: these arrows mean *depends on*, so the ranking says
+what breaks when a package breaks. A CVE in `qs` touches four of seven components; the same CVE in
+`sonic-boom` touches two. That is the order to work in, and nobody had to guess a package name to
+get it. Under `feeds` semantics the same list reads as what waits when a node is late.
+
+It is a ranking of reach, not of blame: "reaches 4" does not promise that four things become
+unreachable if the package disappears, only that four sit behind it. The stronger claim needs
+dominators — [deliberately deferred](../docs/metrics.md#what-is-deliberately-not-reported).
+
 ## See what the shape of a plan allows before committing to a date
 
 ```bash

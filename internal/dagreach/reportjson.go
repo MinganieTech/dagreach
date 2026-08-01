@@ -47,6 +47,7 @@ func StatsJSON(g *Graph, stats *GraphStats, policies []*PolicyResult) map[string
 		"leaves":              stats.Leaves,
 		"isolated":            stats.Isolated,
 		"articulation_points": stats.ArticulationPoints,
+		"most_reaching":       rankingJSON(stats),
 		"longest_path":        criticalPathJSON(stats.LongestPath),
 		"groups":              stats.Groups.Map(),
 		"policies":            policiesJSON(policies),
@@ -166,6 +167,28 @@ func criticalPathJSON(path *CriticalPath) any {
 		"weighted": path.Weighted,
 		"measure":  measure,
 	}
+}
+
+// rankingJSON is null when the ranking was not measured, and `[]` when it was
+// measured and nothing reaches anything - the documented difference between
+// absent and empty.
+func rankingJSON(stats *GraphStats) any {
+	if stats.RankingSkipped {
+		return nil
+	}
+	documents := make([]map[string]any, 0, len(stats.Ranking))
+	for _, entry := range stats.Ranking {
+		share := 0.0
+		if stats.Nodes > 0 {
+			share = roundTo(float64(entry.Reaches)/float64(stats.Nodes), 4)
+		}
+		documents = append(documents, map[string]any{
+			"node":    entry.Node,
+			"reaches": entry.Reaches,
+			"share":   share,
+		})
+	}
+	return documents
 }
 
 func policiesJSON(policies []*PolicyResult) []map[string]any {

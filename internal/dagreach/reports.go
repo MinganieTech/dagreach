@@ -17,6 +17,8 @@ type GraphStats struct {
 	Width              int
 	WidestLevel        []string
 	ArticulationPoints []string
+	Ranking            []NodeReach
+	RankingSkipped     bool
 	LongestPath        *CriticalPath
 	Groups             *Counter
 	Condensed          bool
@@ -80,6 +82,15 @@ func Analyse(g *Graph) *GraphStats {
 
 	path, _ := LongestPath(work, workAdjacency, nil)
 
+	// The ranking holds one reachable set per node, so its memory grows with the
+	// square of the graph: 157 MB at 20k nodes, 2.7 GB at 100k. Past the ceiling
+	// it is skipped and said to be skipped, rather than quietly eating the
+	// machine or quietly disappearing.
+	ranking, skipped := []NodeReach{}, g.NodeCount() > RankingCeiling
+	if !skipped {
+		ranking = ReachRanking(g)
+	}
+
 	return &GraphStats{
 		Nodes:              g.NodeCount(),
 		Edges:              g.EdgeCount(),
@@ -91,6 +102,8 @@ func Analyse(g *Graph) *GraphStats {
 		Width:              len(widest),
 		WidestLevel:        widest,
 		ArticulationPoints: ArticulationPoints(g, adjacency),
+		Ranking:            ranking,
+		RankingSkipped:     skipped,
 		LongestPath:        path,
 		Groups:             groups,
 		Condensed:          len(cycles) > 0,

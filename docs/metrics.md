@@ -72,6 +72,38 @@ disconnect itself.
 through X?" — is answered by dominators, which dagreach does not compute yet. Until it does, treat
 articulation points as a hint about fragility, not as a statement about reachability.
 
+## The ranking: most reaching
+
+Every node, ordered by how many other nodes it reaches — the question the rest of `stats` circles
+without answering. Articulation points name the nodes a graph cannot route around but not how much
+sits behind them; roots name where work starts, not what waits on it.
+
+| | |
+|---|---|
+| Definition | the number of nodes reachable from it, **itself excluded** |
+| Order | largest first, ties in declaration order |
+| Omitted | nodes reaching nothing — a ranking of zeroes is not a ranking |
+| Under `depends-on` | what breaks when this breaks |
+| Under `feeds` | what waits when this is late |
+
+Inside a cycle every member reaches every other **and itself**, because a cycle really does hold its
+own members up. That is the one case where a node counts itself, and it is why a node in a cycle can
+show a share of 100%.
+
+**Read the top of the list with the shape of the graph in mind.** On a graph with one long spine the
+first entries are the head of that spine, each reaching one fewer than the last, and they say little
+beyond "this is a chain". The ranking is most informative where branches compete: which of five
+sources carries the most, which library has the widest blast radius.
+
+**It is not a dominator ranking.** "Reaches 286" is not "286 become unreachable if it goes away" —
+another route may exist. That sharper question needs dominators, which are deliberately deferred;
+see below.
+
+**It is measured only up to `RankingCeiling` (25 000 nodes).** The computation holds one reachable
+set per node, so its memory grows with the square of the graph: 157 MB at 20 000 nodes, 2.7 GB at
+100 000. Past the ceiling `stats` says the ranking was not measured, and the JSON reports
+`most_reaching: null` — never an empty list, which would claim the opposite.
+
 ## Edge semantics
 
 An edge carries a direction but not a meaning, and exports disagree about it:
@@ -108,8 +140,8 @@ number should be read: everything behind it has no alternative route.
 
 ## What is deliberately not reported
 
-- **Dominators** — the directed answer to "is X the only way through?". Planned; see the
-  articulation-point note above.
+- **Dominators** — the directed answer to "is X the only way through?", and the sharper form of the
+  ranking above. Planned; see the articulation-point note.
 - **Bridges** (critical edges) — coming with the structural lint, after 1.0.
 - **Exact maximum antichain** — see the width note above.
 - **Spectral measures** (algebraic connectivity, bottleneck scores) — they would require a linear

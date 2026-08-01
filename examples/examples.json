@@ -64,6 +64,19 @@
       ]
     },
     {
+      "name": "widest-blast-radius",
+      "outcome": "Know what to be careful with, before knowing what to ask about",
+      "args": ["stats", "service-sbom.cdx.json", "--limit", "3"],
+      "exit": 0,
+      "contains": [
+        "edges: cyclonedx profile, source depends on target, so impact follows edges backward",
+        "most reaching (5 of 7 nodes reach anything):",
+        "  pkg:npm/qs@6.11.0 reaches 4 (57%)",
+        "  pkg:npm/sonic-boom@4.0.1 reaches 2 (29%)",
+        "  (+2 more)"
+      ]
+    },
+    {
       "name": "slipped-task",
       "outcome": "Know what a slipped task delays, and by how much",
       "args": ["impact", "release-plan.jgf.json", "--changed", "api", "--limit", "4"],

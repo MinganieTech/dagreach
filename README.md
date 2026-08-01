@@ -78,7 +78,16 @@ shape: depth 7 level(s), width 12 (largest earliest-start generation), 5 root(s)
 longest path: 6 edge(s), structural (no durations declared)
   aws_vpc.main -> aws_subnet.main -> aws_security_group.web (+3 more)
 articulation points (3, undirected reading): aws_vpc.main, aws_subnet.main, aws_iam_role.app
+most reaching (38 of 42 nodes reach anything):
+  aws_vpc.main reaches 31 (74%)
+  aws_subnet.main reaches 22 (52%)
+  aws_iam_role.app reaches 9 (21%)
+  (+35 more)
 ```
+
+The last block is the one that answers "what should I be careful with here?" without knowing what
+to ask about first. Under `depends-on` it reads as what breaks when a node breaks; under `feeds`, as
+what waits when a node is late.
 
 Forget the `--edge-semantics` on a file dagreach recognises and it says so rather than answering
 backwards:
@@ -177,8 +186,8 @@ and pinned by golden files so its shape cannot drift unnoticed.
 | — | JSON report contract, pinned by golden files | done |
 | — | Corpus with a policy per graph, examples by outcome | done |
 | — | Selecting on any attribute, `attr:NAME=VALUE`, and the UNKNOWN verdict | done |
-| — | Ranking nodes by what they block | next |
-| — | Profile-authoring guide | |
+| — | Ranking nodes by what they reach, in `stats` | done |
+| — | Profile-authoring guide | next |
 | T7 | Self-contained HTML report | |
 
 Dominators, structural linting and an HTML explorer are deliberately out of scope for 1.0.
