@@ -145,6 +145,12 @@ endpoints that were never declared, durations that are not numbers, spellings ou
 specification. Syntax errors point at a line and a column. Text output truncates long lists and
 says how many it hid; the JSON report never truncates.
 
+Ambiguity is refused rather than resolved. A JSON document is one value and then the end of the
+file, and a key declared twice in the same object is an error — the specification says nothing about
+which one wins, so two readers of that file would describe two different graphs. Likewise a flag the
+command does not read is a usage error, never a silent no-op: `diff --fail-if-reaches …` used to
+exit `0` with the policy never evaluated.
+
 ### `diff` — what a pull request made reachable that was not
 
 ```console

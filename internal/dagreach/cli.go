@@ -70,17 +70,21 @@ var valued = map[string]bool{
 // evaluated - a gate that passes because nobody ran it. Anything not listed here
 // for the command in hand is a usage error, which is the whole point: dagreach
 // refuses to look like a clean run it did not perform.
+// Each list is complete, output flags included: `profiles` lists what dagreach
+// knows rather than reporting on a graph, so a markdown or HTML rendering of it
+// would be a shape nobody asked for.
 var commandFlags = map[string][]string{
-	"parse": {"--profile", "--format", "--edge-semantics"},
-	"stats": {"--profile", "--format", "--edge-semantics", "--limit", "--fail-on"},
+	"profiles": {"--json"},
+	"parse":    {"--profile", "--format", "--edge-semantics", "--json", "--markdown", "--html"},
+	"stats": {"--profile", "--format", "--edge-semantics", "--limit", "--fail-on",
+		"--json", "--markdown", "--html"},
 	"impact": {"--profile", "--format", "--edge-semantics", "--limit", "--changed",
-		"--explain", "--fail-if-reaches", "--max-impacted", "--fail-on"},
+		"--explain", "--fail-if-reaches", "--max-impacted", "--fail-on",
+		"--json", "--markdown", "--html"},
 	"diff": {"--profile", "--format", "--edge-semantics", "--limit", "--changed",
-		"--explain", "--fail-on-new-reach", "--all-pairs-reachability-delta", "--count-only"},
+		"--explain", "--fail-on-new-reach", "--all-pairs-reachability-delta", "--count-only",
+		"--json", "--markdown", "--html"},
 }
-
-// outputFlags are read by every command, so they are not repeated above.
-var outputFlags = []string{"--json", "--markdown", "--html"}
 
 // checkFlags refuses a flag this command does not read, and a flag that only
 // means something beside another one.
@@ -90,7 +94,7 @@ func checkFlags(command string, parsed *options) error {
 		return nil
 	}
 	allowed := map[string]bool{}
-	for _, flag := range append(append([]string{}, known...), outputFlags...) {
+	for _, flag := range known {
 		allowed[flag] = true
 	}
 	for _, flag := range parsed.seen {
@@ -123,13 +127,6 @@ func Run(args []string, stdout, stderr io.Writer, stdin io.Reader) int {
 	}
 
 	command := args[0]
-	if command == "profiles" {
-		for _, line := range ProfilesText() {
-			fmt.Fprintln(stdout, line)
-		}
-		return ExitOK
-	}
-
 	parsed, err := parseOptions(args[1:])
 	if err != nil {
 		fmt.Fprintf(stderr, "dagreach: %v\n", err)
@@ -144,6 +141,20 @@ func Run(args []string, stdout, stderr io.Writer, stdin io.Reader) int {
 	parsed.argv = append([]string{"dagreach"}, args...)
 
 	switch command {
+	case "profiles":
+		if len(parsed.positional) > 0 {
+			fmt.Fprintln(stderr, "dagreach: profiles takes no arguments")
+			return ExitUsage
+		}
+		if parsed.json {
+			encoded, _ := json.MarshalIndent(ProfilesJSON(), "", "  ")
+			fmt.Fprintln(stdout, string(encoded))
+			return ExitOK
+		}
+		for _, line := range ProfilesText() {
+			fmt.Fprintln(stdout, line)
+		}
+		return ExitOK
 	case "parse", "stats", "impact":
 		return runSingle(command, parsed, stdout, stderr, stdin)
 	case "diff":
@@ -166,12 +177,18 @@ func parseOptions(args []string) (*options, error) {
 		if !contains(parsed.seen, name) {
 			parsed.seen = append(parsed.seen, name)
 		}
-		if valued[name] && !hasInline {
+		switch {
+		case valued[name] && !hasInline:
 			index++
 			if index >= len(args) {
 				return nil, fmt.Errorf("option %s needs a value", name)
 			}
 			value = args[index]
+		case !valued[name] && hasInline:
+			// `--json=false` used to turn JSON on, because a switch never looked
+			// at the value it was handed. A switch is present or absent.
+			return nil, fmt.Errorf("%s is a switch and takes no value; "+
+				"pass %s to turn it on, or leave it out", name, name)
 		}
 
 		switch name {
@@ -206,6 +223,10 @@ func parseOptions(args []string) (*options, error) {
 			if err != nil {
 				return nil, fmt.Errorf("--limit needs a whole number, found '%s'", value)
 			}
+			if limit < 0 {
+				return nil, fmt.Errorf(
+					"--limit cannot be negative; 0 shows everything, found '%s'", value)
+			}
 			parsed.limit = limit
 		case "--changed":
 			parsed.changed = append(parsed.changed, value)
@@ -222,6 +243,13 @@ func parseOptions(args []string) (*options, error) {
 			ceiling, err := strconv.Atoi(value)
 			if err != nil {
 				return nil, fmt.Errorf("--max-impacted needs a whole number, found '%s'", value)
+			}
+			if ceiling < 0 {
+				// A negative ceiling fails every run, including one that touches
+				// nothing, which is a gate nobody meant to write.
+				return nil, fmt.Errorf(
+					"--max-impacted cannot be negative; 0 refuses any impact at all, found '%s'",
+					value)
 			}
 			parsed.maxImpacted = &ceiling
 		case "--all-pairs-reachability-delta":
@@ -603,10 +631,11 @@ func usage() string {
 		"  dagreach diff     BEFORE AFTER --changed ID[,ID...] [--explain]",
 		"                         [--fail-on-new-reach SELECTOR]",
 		"                         [--all-pairs-reachability-delta [--count-only]] [--json]",
-		"  dagreach profiles",
+		"  dagreach profiles [--json]",
 		"",
 		"output: --json for a pipeline, --markdown for a pull-request comment (what the",
-		"        GitHub Action posts), --html for a standalone file; text otherwise",
+		"        GitHub Action posts), --html for a standalone file; text otherwise.",
+		"        A flag the command does not read is a usage error, never a silent no-op",
 		"",
 		"selectors: group=VALUE, status=VALUE, node=ID, attr:NAME=VALUE",
 		"exit codes: 0 ok, 1 a policy failed, 2 usage, 3 a policy could not be settled,",

@@ -63,6 +63,15 @@ policy failed, `2` usage, `3` a policy this graph cannot settle, `4` unreadable 
 | `attributes` | object | `nodes_with_duration`, `edges_with_duration`, `statuses` and `groups` as `{value: count}` |
 | `warnings` | `[string]` | prose |
 
+## `profiles`
+
+The one document that is not about a graph: what this build can read.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `dagreach` | `string` | the version that answered |
+| `profiles[]` | `[object]` | `name`, `produced_by`, `edge_semantics`, `summary`, and `detected` — `false` for `generic`, which is what runs when nothing was recognised |
+
 ## `stats`
 
 Adds to the identity fields above:

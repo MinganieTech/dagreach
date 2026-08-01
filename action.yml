@@ -71,8 +71,11 @@ outputs:
       4 the input could not be read
     value: ${{ steps.run.outputs.exit-code }}
   commented:
-    description: "true when the report was posted as a comment; false on a fork"
-    value: ${{ steps.comment.outputs.commented }}
+    description: >-
+      true when the report was posted as a comment; false otherwise, including
+      when commenting is off, the event is not a pull request, or the pull
+      request comes from another repository
+    value: ${{ steps.comment.outputs.commented || 'false' }}
   report:
     description: "path to the markdown report"
     value: ${{ steps.run.outputs.report }}
@@ -169,12 +172,18 @@ runs:
           echo "::warning::a dagreach policy could not be settled by this graph - see the report"
         fi
 
-    # A pull request from a fork runs with a read-only GITHUB_TOKEN, so posting
-    # would fail the job over a permission nobody can grant from here. The report
-    # is already in the job summary, and the verdict still gates the build, so
-    # the comment is the only thing skipped. Moving to pull_request_target to get
-    # a writable token would run this workflow against the fork's code with the
-    # base repository's secrets - not a trade worth a comment.
+    # A pull request whose head lives in another repository runs with a read-only
+    # GITHUB_TOKEN, so posting would fail the job over a permission nobody can
+    # grant from here. The report is already in the job summary, and the verdict
+    # still gates the build, so the comment is the only thing skipped. Moving to
+    # pull_request_target to get a writable token would run this workflow against
+    # the fork's code with the base repository's secrets - not a trade worth a
+    # comment.
+    #
+    # The test is where the head branch lives, not `head.repo.fork`: a repository
+    # that is itself a fork sets that flag on its own internal pull requests,
+    # where the token is perfectly writable. An empty head.repo means the fork was
+    # deleted, which is also not somewhere we can comment.
     - name: Comment on the pull request
       id: comment
       if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
@@ -184,12 +193,13 @@ runs:
         TAG: ${{ inputs.comment-tag }}
         REPORT: ${{ steps.run.outputs.report }}
         PR: ${{ github.event.pull_request.number }}
-        FORK: ${{ github.event.pull_request.head.repo.fork }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        BASE_REPO: ${{ github.repository }}
       run: |
         set -euo pipefail
-        if [ "$FORK" = "true" ]; then
+        if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
           echo "commented=false" >> "$GITHUB_OUTPUT"
-          echo "::notice::pull request from a fork: the token is read-only, so the report stays in the job summary"
+          echo "::notice::the head branch lives in ${HEAD_REPO:-a deleted repository}, so the token is read-only; the report stays in the job summary"
           exit 0
         fi
         marker="<!-- dagreach:$TAG -->"

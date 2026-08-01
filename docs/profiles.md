@@ -20,6 +20,10 @@ profiles:
              edges: feeds; DOT or JSON Graph Format, no normalisation, semantics up to you
 ```
 
+`dagreach profiles --json` is the same listing for a program: `{name, produced_by, edge_semantics,
+summary, detected}` per profile, so a tool can decide whether to hand dagreach a file — and which
+way its edges will be read — without parsing the text above.
+
 ## terraform
 
 ```bash

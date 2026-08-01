@@ -167,3 +167,16 @@ func TestADocumentIsOneValueAndThenTheEndOfTheFile(t *testing.T) {
 		}
 	}
 }
+
+func TestAKeyDeclaredTwiceMakesTheDocumentAmbiguous(t *testing.T) {
+	// JSON says nothing about which one wins, so two readers of the same file
+	// can describe two different graphs.
+	if _, err := DecodeOrderedJSON(`{"id": "a", "id": "b"}`); err == nil {
+		t.Error("a repeated key was accepted")
+	} else if !strings.Contains(err.Error(), "declared twice") {
+		t.Errorf("err = %v", err)
+	}
+	if _, err := DecodeOrderedJSON(`{"a": {"id": 1}, "b": {"id": 2}}`); err != nil {
+		t.Errorf("the same key in two different objects is ordinary JSON: %v", err)
+	}
+}

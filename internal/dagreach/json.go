@@ -29,11 +29,20 @@ func newObject() *Object {
 	return &Object{values: map[string]any{}}
 }
 
-func (o *Object) set(key string, value any) {
-	if _, present := o.values[key]; !present {
-		o.keys = append(o.keys, key)
+// set declares a key, and refuses to declare it twice.
+//
+// JSON allows a repeated key and says nothing about which one wins, so two
+// readers of the same file can disagree about the graph it describes. A tool
+// whose answers are meant to be arguable cannot start from a document that means
+// two things.
+func (o *Object) set(key string, value any) error {
+	if _, present := o.values[key]; present {
+		return fmt.Errorf("the key '%s' is declared twice in the same object, "+
+			"so the document does not have one meaning", key)
 	}
+	o.keys = append(o.keys, key)
 	o.values[key] = value
+	return nil
 }
 
 // Get returns the value for key, and whether it was present.
@@ -110,7 +119,9 @@ func decodeFrom(decoder *json.Decoder, token json.Token) (any, error) {
 				if err != nil {
 					return nil, err
 				}
-				object.set(key, value)
+				if err := object.set(key, value); err != nil {
+					return nil, err
+				}
 			}
 			if _, err := decoder.Token(); err != nil { // consume '}'
 				return nil, err

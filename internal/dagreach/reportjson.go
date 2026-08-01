@@ -3,6 +3,27 @@ package dagreach
 // The JSON reports. Keys are sorted on the way out, so a consumer can diff two
 // runs, and every document carries a schema_version.
 
+// ProfilesJSON is the machine-readable form of `dagreach profiles`: what this
+// build can read, and which way each producer points its edges. A tool deciding
+// whether to hand dagreach a file asks this rather than parsing the listing.
+func ProfilesJSON() map[string]any {
+	listed := make([]map[string]any, 0, len(ProfileOrder))
+	for _, profile := range Profiles() {
+		listed = append(listed, map[string]any{
+			"name":           profile.Name,
+			"produced_by":    profile.ProducedBy,
+			"edge_semantics": profile.EdgeSemantics,
+			"summary":        profile.Summary,
+			"detected":       profile.Name != "generic",
+		})
+	}
+	return map[string]any{
+		"schema_version": SchemaVersion,
+		"dagreach":       Version,
+		"profiles":       listed,
+	}
+}
+
 // ParseJSON is the machine-readable form of `dagreach parse`.
 func ParseJSON(g *Graph, summary *ProfileSummary) map[string]any {
 	return map[string]any{

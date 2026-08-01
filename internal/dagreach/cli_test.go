@@ -759,3 +759,80 @@ func TestSettlingBothFilesMakesTheComparisonPossibleAgain(t *testing.T) {
 		t.Errorf("an explicit semantics settles both files: %s", errOut)
 	}
 }
+
+// -- small ways to be wrong quietly ----------------------------------------
+
+func TestProfilesReadsItsOwnFlagRatherThanDroppingIt(t *testing.T) {
+	code, out, _ := runCLI("profiles", "--json")
+	if code != ExitOK {
+		t.Fatalf("code = %d", code)
+	}
+	document := mustJSON(t, out)
+	if document["schema_version"].(float64) != float64(SchemaVersion) {
+		t.Errorf("schema_version = %v", document["schema_version"])
+	}
+	listed := document["profiles"].([]any)
+	if len(listed) != len(ProfileOrder) {
+		t.Fatalf("%d profiles listed, %d registered", len(listed), len(ProfileOrder))
+	}
+	first := listed[0].(map[string]any)
+	if first["name"] != ProfileOrder[0] || first["edge_semantics"] == "" {
+		t.Errorf("first entry = %v", first)
+	}
+	if last := listed[len(listed)-1].(map[string]any); last["detected"] != false {
+		t.Error("generic is what runs when nothing was recognised; it is never detected")
+	}
+}
+
+func TestProfilesRefusesWhatItCannotRender(t *testing.T) {
+	for _, args := range [][]string{
+		{"profiles", "--markdown"}, {"profiles", "--html"}, {"profiles", "--limit", "2"},
+	} {
+		if code, _, _ := runCLI(args...); code != ExitUsage {
+			t.Errorf("%v -> code %d", args, code)
+		}
+	}
+	if code, _, errOut := runCLI("profiles", "graph.dot"); code != ExitUsage ||
+		!strings.Contains(errOut, "takes no arguments") {
+		t.Errorf("code=%d err=%q", code, errOut)
+	}
+}
+
+func TestASwitchGivenAValueIsRefusedRatherThanTurnedOn(t *testing.T) {
+	// `--json=false` used to turn JSON on: the switch never looked at the value.
+	for _, flag := range []string{"--json=false", "--markdown=0", "--explain=no", "--html=false"} {
+		code, out, errOut := runCLI("impact", "testdata/pipeline.jgf.json",
+			"--changed", "extract_orders", flag)
+		if code != ExitUsage {
+			t.Errorf("%s -> code %d\n%s", flag, code, out)
+			continue
+		}
+		if !strings.Contains(errOut, "is a switch and takes no value") {
+			t.Errorf("%s -> %q", flag, errOut)
+		}
+	}
+}
+
+func TestNegativeCeilingsAreRefused(t *testing.T) {
+	// A negative --max-impacted fails every run, including one that touches
+	// nothing; a negative --limit silently behaved like 0, which shows everything.
+	cases := map[string][]string{
+		"--limit": {"stats", "testdata/pipeline.jgf.json", "--limit", "-3"},
+		"--max-impacted": {"impact", "testdata/pipeline.jgf.json",
+			"--changed", "extract_orders", "--max-impacted", "-1"},
+	}
+	for flag, args := range cases {
+		code, _, errOut := runCLI(args...)
+		if code != ExitUsage || !strings.Contains(errOut, "cannot be negative") {
+			t.Errorf("%s -> code %d, %q", flag, code, errOut)
+		}
+	}
+	// Zero keeps the meaning each of them documents.
+	if code, _, _ := runCLI("stats", "testdata/pipeline.jgf.json", "--limit", "0"); code != ExitOK {
+		t.Errorf("--limit 0 -> code %d", code)
+	}
+	if code, _, _ := runCLI("impact", "testdata/pipeline.jgf.json",
+		"--changed", "extract_orders", "--max-impacted", "0"); code != ExitPolicyFailed {
+		t.Errorf("--max-impacted 0 refuses any impact at all")
+	}
+}
