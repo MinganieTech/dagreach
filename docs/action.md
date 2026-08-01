@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: terraform graph > infra.dot
-      - uses: MinganieTech/dagreach@main
+      - uses: ./          # not released yet: use it from a checkout of this repository
         with:
           command: impact
           file: infra.dot
@@ -82,6 +82,6 @@ means a policy actually failed.
 ## What it does not do yet
 
 - It builds the binary from source on each run (a few seconds). Once releases are published it
-  will download one instead.
+  will download one instead, and callers will pin `@v0.1.0` rather than a branch.
 - It maps changed *files* to changed *nodes* nowhere: you pass node ids. Deriving them from a diff
   is producer-specific, and doing it generically would be guessing.

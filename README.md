@@ -14,7 +14,11 @@ DOT carries structure, not meaning: which way an edge points is a convention. **
 that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — and it warns rather
 than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
-> **Status: pre-alpha (0.0.1).** Reading, analysis, policies, the reach diff and the first profiles
+> **Status: pre-alpha (0.0.1), private until it is complete and its owner has run a user
+> acceptance test.** What has to be true on the day it goes public is tracked in
+> [docs/publishing.md](docs/publishing.md).
+>
+> **Pre-alpha detail:** Reading, analysis, policies, the reach diff and the first profiles
 > work; the CI action and the HTML report do not exist yet. Written in Go and shipped as a single
 > static binary: nothing to install alongside it.
 
@@ -138,7 +142,7 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 ```yaml
 - uses: actions/checkout@v4
 - run: terraform graph > infra.dot
-- uses: MinganieTech/dagreach@main
+- uses: ./                     # from a checkout; a published reference comes with the first release
   with:
     command: impact
     file: infra.dot
@@ -175,12 +179,14 @@ Dominators, structural linting and an HTML explorer are deliberately out of scop
 
 ## Install
 
-Download the binary for your platform and put it on your PATH. One file, no runtime, no
-dependencies. From source:
+Not released yet, so there is nothing to download. From a checkout:
 
 ```bash
-go install github.com/MinganieTech/dagreach/cmd/dagreach@latest
+go build -o dagreach ./cmd/dagreach
 ```
+
+It produces one static binary with no runtime and no dependencies, which is what the first release
+will publish.
 
 ## Development
 
