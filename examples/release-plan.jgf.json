@@ -1,0 +1,29 @@
+{
+  "graph": {
+    "label": "release-2026-08",
+    "directed": true,
+    "metadata": { "unit": "hours" },
+    "nodes": [
+      { "id": "spec", "metadata": { "duration": 8, "status": "done", "group": "design" } },
+      { "id": "schema", "metadata": { "duration": 6, "status": "done", "group": "backend" } },
+      { "id": "api", "metadata": { "duration": 24, "status": "running", "group": "backend" } },
+      { "id": "worker", "metadata": { "duration": 16, "status": "pending", "group": "backend" } },
+      { "id": "web", "metadata": { "duration": 20, "status": "pending", "group": "frontend" } },
+      { "id": "docs", "metadata": { "duration": 4, "status": "pending", "group": "design" } },
+      { "id": "load-test", "metadata": { "duration": 12, "status": "pending", "group": "quality" } },
+      { "id": "release", "metadata": { "duration": 2, "status": "pending", "group": "release" } }
+    ],
+    "edges": [
+      { "source": "spec", "target": "schema" },
+      { "source": "spec", "target": "docs" },
+      { "source": "schema", "target": "api" },
+      { "source": "schema", "target": "worker" },
+      { "source": "api", "target": "web" },
+      { "source": "api", "target": "load-test" },
+      { "source": "worker", "target": "load-test" },
+      { "source": "web", "target": "release" },
+      { "source": "load-test", "target": "release" },
+      { "source": "docs", "target": "release" }
+    ]
+  }
+}

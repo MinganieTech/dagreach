@@ -1,0 +1,16 @@
+// The same map after a pull request. One edge was added - token now calls
+// payments - and it looks harmless in review.
+digraph services {
+	auth      [group = "core"]
+	token     [group = "core"]
+	search    [group = "core"]
+	reporting [group = "analytics"]
+	payments  [group = "production"]
+	ledger    [group = "production"]
+
+	auth -> token
+	auth -> search
+	token -> payments
+	reporting -> payments
+	ledger -> payments
+}

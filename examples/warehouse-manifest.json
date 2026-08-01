@@ -1,0 +1,74 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "dbt_version": "1.9.2",
+    "project_name": "warehouse",
+    "adapter_type": "snowflake"
+  },
+  "nodes": {
+    "model.warehouse.stg_orders": {
+      "resource_type": "model", "name": "stg_orders", "package_name": "warehouse",
+      "schema": "staging", "path": "staging/stg_orders.sql",
+      "config": { "materialized": "view", "tags": ["staging"] }
+    },
+    "model.warehouse.stg_customers": {
+      "resource_type": "model", "name": "stg_customers", "package_name": "warehouse",
+      "schema": "staging", "path": "staging/stg_customers.sql",
+      "config": { "materialized": "view", "tags": ["staging"] }
+    },
+    "model.warehouse.fct_orders": {
+      "resource_type": "model", "name": "fct_orders", "package_name": "warehouse",
+      "schema": "marts", "path": "marts/fct_orders.sql",
+      "config": { "materialized": "table", "tags": ["marts"] }
+    },
+    "model.warehouse.dim_customers": {
+      "resource_type": "model", "name": "dim_customers", "package_name": "warehouse",
+      "schema": "marts", "path": "marts/dim_customers.sql",
+      "config": { "materialized": "table", "tags": ["marts"] }
+    },
+    "test.warehouse.not_null_fct_orders_id": {
+      "resource_type": "test", "name": "not_null_fct_orders_id", "package_name": "warehouse",
+      "config": { "materialized": "test", "tags": [] }
+    },
+    "test.warehouse.unique_dim_customers_id": {
+      "resource_type": "test", "name": "unique_dim_customers_id", "package_name": "warehouse",
+      "config": { "materialized": "test", "tags": [] }
+    }
+  },
+  "sources": {
+    "source.warehouse.shop.orders": {
+      "resource_type": "source", "name": "orders", "package_name": "warehouse",
+      "schema": "raw", "database": "shop"
+    },
+    "source.warehouse.shop.customers": {
+      "resource_type": "source", "name": "customers", "package_name": "warehouse",
+      "schema": "raw", "database": "shop"
+    }
+  },
+  "exposures": {
+    "exposure.warehouse.revenue_dashboard": {
+      "resource_type": "exposure", "name": "revenue_dashboard", "package_name": "warehouse"
+    },
+    "exposure.warehouse.crm_sync": {
+      "resource_type": "exposure", "name": "crm_sync", "package_name": "warehouse"
+    }
+  },
+  "child_map": {
+    "source.warehouse.shop.orders": ["model.warehouse.stg_orders"],
+    "source.warehouse.shop.customers": ["model.warehouse.stg_customers"],
+    "model.warehouse.stg_orders": ["model.warehouse.fct_orders"],
+    "model.warehouse.stg_customers": ["model.warehouse.fct_orders", "model.warehouse.dim_customers"],
+    "model.warehouse.fct_orders": [
+      "test.warehouse.not_null_fct_orders_id",
+      "exposure.warehouse.revenue_dashboard"
+    ],
+    "model.warehouse.dim_customers": [
+      "test.warehouse.unique_dim_customers_id",
+      "exposure.warehouse.crm_sync"
+    ],
+    "test.warehouse.not_null_fct_orders_id": [],
+    "test.warehouse.unique_dim_customers_id": [],
+    "exposure.warehouse.revenue_dashboard": [],
+    "exposure.warehouse.crm_sync": []
+  }
+}

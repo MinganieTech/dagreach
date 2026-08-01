@@ -1,0 +1,15 @@
+// A service map as it stands today. `auth` is a core service; nothing it
+// touches reaches anything tagged production.
+digraph services {
+	auth      [group = "core"]
+	token     [group = "core"]
+	search    [group = "core"]
+	reporting [group = "analytics"]
+	payments  [group = "production"]
+	ledger    [group = "production"]
+
+	auth -> token
+	auth -> search
+	reporting -> payments
+	ledger -> payments
+}

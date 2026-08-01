@@ -1,0 +1,86 @@
+{
+  "comment": [
+    "Every example in README.md, as a runnable case. internal/dagreach/examples_test.go",
+    "runs each one and checks the exit code and the lines the documentation quotes,",
+    "so an example cannot rot into a lie without failing CI."
+  ],
+  "examples": [
+    {
+      "name": "production-database",
+      "outcome": "Stop an infrastructure change from reaching a production database",
+      "args": ["impact", "infra.dot", "--changed", "aws_vpc.main",
+               "--fail-if-reaches", "group=aws_db_instance", "--explain", "--limit", "4"],
+      "exit": 1,
+      "contains": [
+        "edges: terraform profile, source depends on target",
+        "FAIL fail-if-reaches group=aws_db_instance",
+        "aws_db_instance.orders: aws_vpc.main -> aws_subnet.private -> aws_db_instance.orders"
+      ]
+    },
+    {
+      "name": "new-route-to-production",
+      "outcome": "Catch a pull request that opens a new route to production",
+      "args": ["diff", "services-before.dot", "services-after.dot", "--changed", "auth",
+               "--explain", "--fail-on-new-reach", "group=production"],
+      "exit": 1,
+      "contains": [
+        "new reach (1): payments",
+        "reason: new edge token -> payments",
+        "FAIL fail-on-new-reach group=production"
+      ]
+    },
+    {
+      "name": "vulnerable-package",
+      "outcome": "Find what a vulnerable package reaches, across ecosystems",
+      "args": ["impact", "service-sbom.cdx.json", "--changed", "pkg:npm/qs@6.11.0",
+               "--fail-if-reaches", "group=application", "--limit", "3"],
+      "exit": 1,
+      "contains": [
+        "edges: cyclonedx profile, source depends on target",
+        "reaches 5 of 7 nodes (71%)",
+        "FAIL fail-if-reaches group=application"
+      ]
+    },
+    {
+      "name": "changed-source",
+      "outcome": "Know which models, tests and dashboards a changed source reaches",
+      "args": ["impact", "warehouse-manifest.json",
+               "--changed", "source.warehouse.shop.customers", "--explain", "--limit", "3"],
+      "exit": 0,
+      "contains": [
+        "edges: dbt profile, source feeds target",
+        "reaches 8 of 10 nodes (80%)",
+        "groups touched: model 3, test 2, source 1, exposure 2"
+      ]
+    },
+    {
+      "name": "release-shape",
+      "outcome": "See what the shape of a plan allows before committing to a date",
+      "args": ["stats", "release-plan.jgf.json", "--limit", "4"],
+      "exit": 0,
+      "contains": [
+        "depth 5 level(s), width 2 (largest earliest-start generation)",
+        "critical path: 60 of duration over 4 edge(s)"
+      ]
+    },
+    {
+      "name": "slipped-task",
+      "outcome": "Know what a slipped task delays, and by how much",
+      "args": ["impact", "release-plan.jgf.json", "--changed", "api", "--limit", "4"],
+      "exit": 0,
+      "contains": [
+        "downstream (3): web, load-test, release",
+        "cost of the impacted set: 58 of declared duration",
+        "critical path within the impacted set: 46 of duration over 2 edge(s)"
+      ]
+    },
+    {
+      "name": "ceiling",
+      "outcome": "Refuse a change that touches more of the graph than the team accepts",
+      "args": ["impact", "warehouse-manifest.json",
+               "--changed", "source.warehouse.shop.customers", "--max-impacted", "5"],
+      "exit": 1,
+      "contains": ["FAIL max-impacted 5: 8 node(s) impacted, ceiling is 5"]
+    }
+  ]
+}
