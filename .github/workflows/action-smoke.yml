@@ -1,0 +1,67 @@
+name: Action smoke test
+
+# Runs the *published* action against this repository's fixtures, on the three
+# systems it supports.
+#
+# It exists because the example gate cannot cover this: that one exercises the
+# CLI built from the pull request, while what the action adds on top is the
+# download, the checksum and the archive format - and those differ by platform
+# (zip against tar.gz, sha256sum against shasum). This is the only place that
+# path is exercised at all, so it is run by hand after cutting a release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "the released tag to test, e.g. v0.1.0-rc.1"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: A verdict that must fail
+        id: failing
+        uses: MinganieTech/dagreach@v0.1.0-rc.1
+        with:
+          version: ${{ inputs.version }}
+          command: impact
+          file: internal/dagreach/testdata/sbom.cdx.json
+          changed: pkg:npm/qs@6.11.0
+          fail-if-reaches: group=root
+          comment: "false"
+        continue-on-error: true
+
+      - name: A verdict that must pass
+        id: passing
+        uses: MinganieTech/dagreach@v0.1.0-rc.1
+        with:
+          version: ${{ inputs.version }}
+          command: stats
+          file: internal/dagreach/testdata/pipeline.jgf.json
+          comment: "false"
+
+      - name: The verdicts are what they claim
+        shell: bash
+        env:
+          FAILING: ${{ steps.failing.outputs.verdict }}
+          FAILING_CODE: ${{ steps.failing.outputs.exit-code }}
+          PASSING: ${{ steps.passing.outputs.verdict }}
+          COMMENTED: ${{ steps.passing.outputs.commented }}
+        run: |
+          set -euo pipefail
+          echo "failing: $FAILING ($FAILING_CODE), passing: $PASSING, commented: $COMMENTED"
+          [ "$FAILING" = "fail" ] || { echo "::error::expected fail, got '$FAILING'"; exit 1; }
+          [ "$FAILING_CODE" = "1" ] || { echo "::error::expected exit 1, got '$FAILING_CODE'"; exit 1; }
+          [ "$PASSING" = "pass" ] || { echo "::error::expected pass, got '$PASSING'"; exit 1; }
+          # Commenting was off, so the output must still be a boolean and not empty.
+          [ "$COMMENTED" = "false" ] || { echo "::error::commented = '$COMMENTED'"; exit 1; }
