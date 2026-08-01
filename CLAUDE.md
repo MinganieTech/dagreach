@@ -31,9 +31,10 @@ The metrics exist to support that decision; they are not the product.
 - **Printed text is ASCII.** A Windows console on a legacy code page renders anything else as `?`.
   Docstrings and documentation are free; CLI output is not, and a test enforces it.
 - **Exit codes are a public contract** (`0` ok, `1` a policy failed, `2` usage error, `4` the input
-  could not be read; `3` is retired). CI pipelines depend on them; changing one is a breaking
-  change. A broken selector or a missing file must never exit `1`: an unusable input must
-  not be indistinguishable from a clean gate.
+  could not be read; `3` is reserved for UNKNOWN, arriving with the verdict model in T6.1). CI
+  pipelines depend on them; changing one is a breaking change. A broken selector or a missing file
+  must never exit `1`: an unusable input must not be indistinguishable from a clean gate, and an
+  undeterminable policy must never be indistinguishable from a satisfied one.
 - **A format is only supported when it carries a graph.** DOT and JSON Graph Format do; YAML does
   not, so there is no generic YAML reader - only producer profiles that happen to read YAML. The
   same test applies to any future format: if reading it generically would require guessing what a
