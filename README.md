@@ -143,6 +143,7 @@ $ dagreach diff before.dot after.dot --fail-on cycle
 | T3 | Edge semantics, `--explain`, policies and CI exit codes | done |
 | T4 | Reach diff between two graphs, `--fail-on-new-reach` | done |
 | T5 | Profiles: Terraform, dbt, CycloneDX, generic | done |
+| — | CI pipeline profiles (GitHub Actions, GitLab CI) | [undecided](docs/decisions-ci-yaml.md) |
 | T6 | GitHub Action and pull-request comment | next |
 | T7 | Self-contained HTML report | |
 
