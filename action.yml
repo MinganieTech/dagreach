@@ -11,10 +11,10 @@ branding:
 inputs:
   version:
     description: >-
-      the released tag to run, e.g. v0.1.0-rc.1. Pin it to a tag you have looked
+      the released tag to run, e.g. v0.1.0-rc.2. Pin it to a tag you have looked
       at: the checksum proves the download arrived intact, not that the release
       is what its author meant to publish.
-    default: v0.1.0-rc.1
+    default: v0.1.0-rc.2
   command:
     description: "impact, diff, stats or parse"
     default: impact

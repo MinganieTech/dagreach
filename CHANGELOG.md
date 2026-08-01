@@ -4,6 +4,18 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 1.0, a minor bump may break things, and the JSON report carries its own `schema_version` so a
 consumer can tell.
 
+## v0.1.0-rc.2
+
+Fixes one defect in `rc.1`, found by running the published action on all three systems - the first
+time that path had ever run.
+
+- The action passed `--explain` to every command but `parse`, including `stats`, which does not read
+  it. Silently dropped until per-command flag validation turned it into a usage error, so the
+  strictness that closed a fail-open path opened a different one in the caller. `stats` through the
+  action now works; `impact` and `diff` were never affected.
+
+The `rc.1` binary itself is sound: the defect was in `action.yml`, and only for `stats`.
+
 ## v0.1.0-rc.1
 
 First release. Everything below has existed for a while in the repository; this is the point at

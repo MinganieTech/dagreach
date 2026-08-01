@@ -32,7 +32,7 @@ const DefaultLimit = 10
 
 // Version is the release this build claims to be. It has one home, and the
 // release workflow refuses a tag that disagrees with it.
-const Version = "0.1.0-rc.1"
+const Version = "0.1.0-rc.2"
 
 type options struct {
 	positional     []string

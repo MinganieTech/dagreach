@@ -14,7 +14,7 @@ DOT carries structure, not meaning: which way an edge points is a convention. **
 that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — and it warns rather
 than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
-> **Status: `v0.1.0-rc.1`, a release candidate before 1.0.** Everything on the roadmap below is
+> **Status: `v0.1.0-rc.2`, a release candidate before 1.0.** Everything on the roadmap below is
 > built. The command line, the exit codes and the JSON report are meant to be stable — but nobody
 > outside the project has used this in anger yet, which is what a release candidate is for. Written
 > in Go and shipped as a single static binary: nothing to install alongside it.
@@ -180,7 +180,7 @@ is not, they are oriented in opposite directions, so dagreach refuses and asks f
 ```yaml
 - uses: actions/checkout@v4
 - run: terraform graph > infra.dot
-- uses: MinganieTech/dagreach@v0.1.0-rc.1
+- uses: MinganieTech/dagreach@v0.1.0-rc.2
   with:
     command: impact
     file: infra.dot
@@ -232,7 +232,7 @@ HTML report above is a page, not a viewer: it draws no graph and runs no script.
 ## Install
 
 ```bash
-go install github.com/MinganieTech/dagreach/cmd/dagreach@v0.1.0-rc.1
+go install github.com/MinganieTech/dagreach/cmd/dagreach@v0.1.0-rc.2
 ```
 
 Or take a binary from [the releases](https://github.com/MinganieTech/dagreach/releases) — Linux,
