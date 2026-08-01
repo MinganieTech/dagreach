@@ -1,0 +1,191 @@
+name: dagreach
+description: >-
+  Portable change-impact analysis for dependency graphs. See what a change can reach,
+  why it reaches it, and whether CI should allow it.
+author: Minganie Technologies
+
+branding:
+  icon: git-branch
+  color: blue
+
+inputs:
+  command:
+    description: "impact, diff, stats or parse"
+    default: impact
+  file:
+    description: "the graph, for impact/stats/parse"
+    default: ""
+  before:
+    description: "the graph as it was, for diff"
+    default: ""
+  after:
+    description: "the graph as it is now, for diff"
+    default: ""
+  changed:
+    description: "changed node ids, comma separated"
+    default: ""
+  profile:
+    description: "terraform, dbt, cyclonedx or generic; detected from the file when empty"
+    default: ""
+  edge-semantics:
+    description: "feeds or depends-on; the profile decides when empty"
+    default: ""
+  format:
+    description: "dot or jgf; detected when empty"
+    default: ""
+  fail-if-reaches:
+    description: "selector, e.g. group=production; repeatable with one per line"
+    default: ""
+  fail-on-new-reach:
+    description: "selector judged against BEFORE, for diff; one per line"
+    default: ""
+  max-impacted:
+    description: "fail when more than N nodes are impacted"
+    default: ""
+  fail-on:
+    description: "fail on a condition; only 'cycle' today"
+    default: ""
+  explain:
+    description: "show why each node is reached"
+    default: "true"
+  limit:
+    description: "items per list in the comment; 0 shows everything"
+    default: "10"
+  comment:
+    description: "post (and update) a pull-request comment"
+    default: "true"
+  comment-tag:
+    description: "identifies the comment to update, so runs do not stack up"
+    default: dagreach
+  token:
+    description: "token used to comment; needs pull-requests: write"
+    default: ${{ github.token }}
+
+outputs:
+  verdict:
+    description: "pass or fail"
+    value: ${{ steps.run.outputs.verdict }}
+  exit-code:
+    description: "0 ok, 1 a policy failed, 2 usage, 4 the input could not be read"
+    value: ${{ steps.run.outputs.exit-code }}
+  report:
+    description: "path to the markdown report"
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: "1.26"
+        cache: false
+
+    - name: Build dagreach
+      shell: bash
+      run: go build -o "$RUNNER_TEMP/dagreach" "$GITHUB_ACTION_PATH/cmd/dagreach"
+
+    - name: Run dagreach
+      id: run
+      shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_FILE: ${{ inputs.file }}
+        INPUT_BEFORE: ${{ inputs.before }}
+        INPUT_AFTER: ${{ inputs.after }}
+        INPUT_CHANGED: ${{ inputs.changed }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_EDGE_SEMANTICS: ${{ inputs.edge-semantics }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_FAIL_IF_REACHES: ${{ inputs.fail-if-reaches }}
+        INPUT_FAIL_ON_NEW_REACH: ${{ inputs.fail-on-new-reach }}
+        INPUT_MAX_IMPACTED: ${{ inputs.max-impacted }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_EXPLAIN: ${{ inputs.explain }}
+        INPUT_LIMIT: ${{ inputs.limit }}
+      run: |
+        set -uo pipefail
+        args=("$INPUT_COMMAND")
+
+        case "$INPUT_COMMAND" in
+          diff)
+            [ -n "$INPUT_BEFORE" ] && [ -n "$INPUT_AFTER" ] || {
+              echo "::error::diff needs 'before' and 'after'"; exit 2; }
+            args+=("$INPUT_BEFORE" "$INPUT_AFTER") ;;
+          *)
+            [ -n "$INPUT_FILE" ] || { echo "::error::$INPUT_COMMAND needs 'file'"; exit 2; }
+            args+=("$INPUT_FILE") ;;
+        esac
+
+        [ -n "$INPUT_CHANGED" ] && args+=(--changed "$INPUT_CHANGED")
+        [ -n "$INPUT_PROFILE" ] && args+=(--profile "$INPUT_PROFILE")
+        [ -n "$INPUT_EDGE_SEMANTICS" ] && args+=(--edge-semantics "$INPUT_EDGE_SEMANTICS")
+        [ -n "$INPUT_FORMAT" ] && args+=(--format "$INPUT_FORMAT")
+        [ -n "$INPUT_MAX_IMPACTED" ] && args+=(--max-impacted "$INPUT_MAX_IMPACTED")
+        [ -n "$INPUT_FAIL_ON" ] && args+=(--fail-on "$INPUT_FAIL_ON")
+        [ "$INPUT_EXPLAIN" = "true" ] && [ "$INPUT_COMMAND" != "parse" ] && args+=(--explain)
+        [ "$INPUT_COMMAND" != "parse" ] && args+=(--limit "$INPUT_LIMIT")
+
+        while IFS= read -r selector; do
+          [ -n "$selector" ] && args+=(--fail-if-reaches "$selector")
+        done <<< "$INPUT_FAIL_IF_REACHES"
+        while IFS= read -r selector; do
+          [ -n "$selector" ] && args+=(--fail-on-new-reach "$selector")
+        done <<< "$INPUT_FAIL_ON_NEW_REACH"
+
+        report="$RUNNER_TEMP/dagreach-report.md"
+        echo "running: dagreach ${args[*]}"
+        "$RUNNER_TEMP/dagreach" "${args[@]}" --markdown > "$report"
+        code=$?
+        cat "$report"
+
+        verdict=pass
+        [ "$code" -eq 1 ] && verdict=fail
+        {
+          echo "exit-code=$code"
+          echo "verdict=$verdict"
+          echo "report=$report"
+        } >> "$GITHUB_OUTPUT"
+
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
+
+        # 2 and 4 mean the run never happened; they fail here rather than be
+        # reported as a clean gate.
+        if [ "$code" -ge 2 ]; then
+          echo "::error::dagreach could not run (exit $code)"
+          exit "$code"
+        fi
+
+    - name: Comment on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        TAG: ${{ inputs.comment-tag }}
+        REPORT: ${{ steps.run.outputs.report }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+        marker="<!-- dagreach:$TAG -->"
+        body="$(printf '%s\n\n%s\n' "$marker" "$(cat "$REPORT")")"
+
+        # One comment per tag, updated in place: a gate that stacks up twenty
+        # comments on a busy pull request is a gate people mute.
+        existing=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
+          --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")
+
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+            -f body="$body" > /dev/null
+          echo "updated comment $existing"
+        else
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
+            -f body="$body" > /dev/null
+          echo "posted a new comment"
+        fi
+
+    - name: Fail when a policy failed
+      if: ${{ steps.run.outputs.exit-code == '1' }}
+      shell: bash
+      run: |
+        echo "::error::a dagreach policy failed - see the report above"
+        exit 1

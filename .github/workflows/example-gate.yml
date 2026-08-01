@@ -1,0 +1,42 @@
+name: Example gate
+
+# Exercises the action end to end on every pull request, against the fixtures
+# in this repository. It is a demonstration and a test at once: if the action
+# stops working, this is where it shows.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  supply-chain:
+    name: Does a vulnerable package reach the product?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          command: impact
+          file: internal/dagreach/testdata/sbom.cdx.json
+          changed: pkg:npm/qs@6.11.0
+          fail-if-reaches: group=root
+          comment-tag: supply-chain
+        # This one is meant to fail: it is what a real blocking verdict looks
+        # like, and the comment it posts is the point of the demonstration.
+        continue-on-error: true
+
+  data-lineage:
+    name: What does a changed source reach downstream?
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          command: impact
+          file: internal/dagreach/testdata/dbt-manifest.json
+          changed: source.acme_analytics.shop.orders
+          max-impacted: "100"
+          comment-tag: data-lineage
