@@ -150,7 +150,9 @@ The action runs one command, posts the report as a pull-request comment - one co
 updated in place rather than stacked - and fails the job when a policy fails. An unusable run
 (exit `2` or `4`) fails loudly instead of passing quietly. See [docs/action.md](docs/action.md).
 
-Every command also takes `--markdown`, which is exactly what the action posts, and `--json`.
+Every command also takes `--markdown`, which is exactly what the action posts, and `--json` —
+a versioned contract meant for other tools, described in [docs/json-report.md](docs/json-report.md)
+and pinned by golden files so its shape cannot drift unnoticed.
 
 ## Roadmap
 
@@ -165,8 +167,8 @@ Every command also takes `--markdown`, which is exactly what the action posts, a
 | T6 | GitHub Action, `--markdown`, pull-request comment | done |
 | T6.1 | PASS / FAIL / UNKNOWN verdict qualification | waits for T6.2, which produces the first UNKNOWN |
 | T6.2 | Experimental GitHub Actions profile (see [the decisions](docs/decisions-ci-yaml.md)) | |
-| — | JSON report contract, pinned by golden files | next |
-| — | Corpus with a policy per graph, examples by outcome | |
+| — | JSON report contract, pinned by golden files | done |
+| — | Corpus with a policy per graph, examples by outcome | next |
 | — | Profile-authoring guide | |
 | T7 | Self-contained HTML report | |
 

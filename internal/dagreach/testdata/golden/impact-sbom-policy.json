@@ -1,0 +1,101 @@
+{
+  "changed": [
+    "pkg:npm/qs@6.11.0"
+  ],
+  "cost": null,
+  "downstream": [
+    "pkg:npm/checkout-service@2.4.0",
+    "pkg:npm/express@4.19.2",
+    "pkg:npm/body-parser@1.20.2"
+  ],
+  "edge_semantics": "depends-on",
+  "explain": {
+    "pkg:npm/body-parser@1.20.2": {
+      "distance": 1,
+      "path": [
+        "pkg:npm/qs@6.11.0",
+        "pkg:npm/body-parser@1.20.2"
+      ]
+    },
+    "pkg:npm/checkout-service@2.4.0": {
+      "distance": 3,
+      "path": [
+        "pkg:npm/qs@6.11.0",
+        "pkg:npm/body-parser@1.20.2",
+        "pkg:npm/express@4.19.2",
+        "pkg:npm/checkout-service@2.4.0"
+      ]
+    },
+    "pkg:npm/express@4.19.2": {
+      "distance": 2,
+      "path": [
+        "pkg:npm/qs@6.11.0",
+        "pkg:npm/body-parser@1.20.2",
+        "pkg:npm/express@4.19.2"
+      ]
+    }
+  },
+  "groups": {
+    "library": 3,
+    "root": 1
+  },
+  "impacted": [
+    "pkg:npm/qs@6.11.0",
+    "pkg:npm/checkout-service@2.4.0",
+    "pkg:npm/express@4.19.2",
+    "pkg:npm/body-parser@1.20.2"
+  ],
+  "impacted_articulation_points": [],
+  "impacted_count": 4,
+  "impacted_leaves": [
+    "pkg:npm/checkout-service@2.4.0"
+  ],
+  "longest_path": {
+    "cost": 3,
+    "edges": 3,
+    "measure": "edges",
+    "nodes": [
+      "pkg:npm/qs@6.11.0",
+      "pkg:npm/body-parser@1.20.2",
+      "pkg:npm/express@4.19.2",
+      "pkg:npm/checkout-service@2.4.0"
+    ],
+    "weighted": false
+  },
+  "policies": [
+    {
+      "detail": "1 node(s) matching group=root are reached",
+      "failed": true,
+      "matched": [
+        "pkg:npm/checkout-service@2.4.0"
+      ],
+      "policy": "fail-if-reaches",
+      "subject": "group=root",
+      "witnesses": {
+        "pkg:npm/checkout-service@2.4.0": [
+          "pkg:npm/qs@6.11.0",
+          "pkg:npm/body-parser@1.20.2",
+          "pkg:npm/express@4.19.2",
+          "pkg:npm/checkout-service@2.4.0"
+        ]
+      }
+    },
+    {
+      "detail": "4 node(s) impacted, ceiling is 2",
+      "failed": true,
+      "matched": [],
+      "policy": "max-impacted",
+      "subject": "2",
+      "witnesses": {}
+    }
+  ],
+  "profile": "cyclonedx",
+  "schema_version": 1,
+  "share": 1,
+  "source": "testdata/sbom.cdx.json",
+  "total_nodes": 4,
+  "upstream": [],
+  "warnings": [
+    "read with the cyclonedx profile, recognised from the file itself; pass --profile to choose explicitly"
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "changed": [
+    "source.acme_analytics.shop.orders"
+  ],
+  "cost": null,
+  "downstream": [
+    "model.acme_analytics.stg_orders",
+    "model.acme_analytics.fct_orders",
+    "test.acme_analytics.not_null_fct_orders_id",
+    "exposure.acme_analytics.revenue_dashboard"
+  ],
+  "edge_semantics": "feeds",
+  "explain": {
+    "exposure.acme_analytics.revenue_dashboard": {
+      "distance": 3,
+      "path": [
+        "source.acme_analytics.shop.orders",
+        "model.acme_analytics.stg_orders",
+        "model.acme_analytics.fct_orders",
+        "exposure.acme_analytics.revenue_dashboard"
+      ]
+    },
+    "model.acme_analytics.fct_orders": {
+      "distance": 2,
+      "path": [
+        "source.acme_analytics.shop.orders",
+        "model.acme_analytics.stg_orders",
+        "model.acme_analytics.fct_orders"
+      ]
+    },
+    "model.acme_analytics.stg_orders": {
+      "distance": 1,
+      "path": [
+        "source.acme_analytics.shop.orders",
+        "model.acme_analytics.stg_orders"
+      ]
+    },
+    "test.acme_analytics.not_null_fct_orders_id": {
+      "distance": 3,
+      "path": [
+        "source.acme_analytics.shop.orders",
+        "model.acme_analytics.stg_orders",
+        "model.acme_analytics.fct_orders",
+        "test.acme_analytics.not_null_fct_orders_id"
+      ]
+    }
+  },
+  "groups": {
+    "exposure": 1,
+    "model": 2,
+    "source": 1,
+    "test": 1
+  },
+  "impacted": [
+    "source.acme_analytics.shop.orders",
+    "model.acme_analytics.stg_orders",
+    "model.acme_analytics.fct_orders",
+    "test.acme_analytics.not_null_fct_orders_id",
+    "exposure.acme_analytics.revenue_dashboard"
+  ],
+  "impacted_articulation_points": [],
+  "impacted_count": 5,
+  "impacted_leaves": [
+    "test.acme_analytics.not_null_fct_orders_id",
+    "exposure.acme_analytics.revenue_dashboard"
+  ],
+  "longest_path": {
+    "cost": 3,
+    "edges": 3,
+    "measure": "edges",
+    "nodes": [
+      "source.acme_analytics.shop.orders",
+      "model.acme_analytics.stg_orders",
+      "model.acme_analytics.fct_orders",
+      "test.acme_analytics.not_null_fct_orders_id"
+    ],
+    "weighted": false
+  },
+  "policies": [],
+  "profile": "dbt",
+  "schema_version": 1,
+  "share": 1,
+  "source": "testdata/dbt-manifest.json",
+  "total_nodes": 5,
+  "upstream": [],
+  "warnings": [
+    "read with the dbt profile, recognised from the file itself; pass --profile to choose explicitly"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "attributes": {
+    "edges_with_duration": 0,
+    "groups": {
+      "aws_instance": 1,
+      "aws_security_group": 1,
+      "aws_subnet": 1,
+      "aws_vpc": 1,
+      "provider": 1
+    },
+    "nodes_with_duration": 0,
+    "statuses": {}
+  },
+  "directed": true,
+  "duplicate_edges": 0,
+  "edge_semantics": "depends-on",
+  "edges": 5,
+  "format": "dot",
+  "name": null,
+  "nodes": 5,
+  "profile": "terraform",
+  "schema_version": 1,
+  "self_loops": 0,
+  "source": "testdata/terraform.dot",
+  "warnings": [
+    "read with the terraform profile, recognised from the file itself; pass --profile to choose explicitly"
+  ]
+}

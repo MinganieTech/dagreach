@@ -1,0 +1,14 @@
+// A graph that is not the acyclic thing its name promises: two of the three
+// jobs feed each other. Used to pin what a report says when cycles are
+// collapsed before the metrics that need acyclicity.
+digraph pipeline {
+	build   [group = "ci", duration = "30"]
+	test    [group = "ci", duration = "120"]
+	lint    [group = "ci", duration = "20"]
+	publish [group = "release", duration = "45"]
+
+	build -> test
+	test -> build
+	test -> lint
+	lint -> publish
+}

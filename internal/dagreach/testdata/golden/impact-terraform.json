@@ -1,0 +1,54 @@
+{
+  "changed": [
+    "aws_vpc.main"
+  ],
+  "cost": null,
+  "downstream": [
+    "aws_instance.web",
+    "aws_security_group.web",
+    "aws_subnet.main"
+  ],
+  "edge_semantics": "depends-on",
+  "groups": {
+    "aws_instance": 1,
+    "aws_security_group": 1,
+    "aws_subnet": 1,
+    "aws_vpc": 1
+  },
+  "impacted": [
+    "aws_vpc.main",
+    "aws_instance.web",
+    "aws_security_group.web",
+    "aws_subnet.main"
+  ],
+  "impacted_articulation_points": [
+    "aws_vpc.main"
+  ],
+  "impacted_count": 4,
+  "impacted_leaves": [
+    "aws_instance.web"
+  ],
+  "longest_path": {
+    "cost": 2,
+    "edges": 2,
+    "measure": "edges",
+    "nodes": [
+      "aws_vpc.main",
+      "aws_security_group.web",
+      "aws_instance.web"
+    ],
+    "weighted": false
+  },
+  "policies": [],
+  "profile": "terraform",
+  "schema_version": 1,
+  "share": 0.8,
+  "source": "testdata/terraform.dot",
+  "total_nodes": 5,
+  "upstream": [
+    "provider[\"registry.terraform.io/hashicorp/aws\"]"
+  ],
+  "warnings": [
+    "read with the terraform profile, recognised from the file itself; pass --profile to choose explicitly"
+  ]
+}

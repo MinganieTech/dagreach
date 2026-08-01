@@ -1,0 +1,36 @@
+{
+  "added_reach": [],
+  "after": "testdata/gate-after.dot",
+  "all_pairs_reachability_delta": {
+    "added_by_source": {
+      "auth": 1,
+      "token": 1
+    },
+    "added_pairs": 2,
+    "removed_by_source": {},
+    "removed_pairs": 0,
+    "sources": 5
+  },
+  "before": "testdata/gate-before.dot",
+  "changed": [],
+  "changed_missing_after": [],
+  "changed_missing_before": [],
+  "edge_semantics": "feeds",
+  "edges_added": [
+    [
+      "token",
+      "payments"
+    ]
+  ],
+  "edges_removed": [],
+  "exposures": [],
+  "nodes_added": [],
+  "nodes_removed": [],
+  "policies": [],
+  "profile": "generic",
+  "reached_after": [],
+  "reached_before": [],
+  "removed_reach": [],
+  "schema_version": 1,
+  "warnings": []
+}

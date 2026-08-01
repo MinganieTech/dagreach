@@ -1,0 +1,48 @@
+{
+  "acyclic": true,
+  "articulation_points": [
+    "transform_orders",
+    "load_warehouse"
+  ],
+  "collapsed_cycles": {},
+  "condensed": false,
+  "cycles": [],
+  "depth": 4,
+  "edge_semantics": "feeds",
+  "edges": 4,
+  "groups": {
+    "extract": 2,
+    "load": 2,
+    "transform": 1
+  },
+  "isolated": [],
+  "leaves": [
+    "notify"
+  ],
+  "longest_path": {
+    "cost": 660,
+    "edges": 2,
+    "measure": "duration",
+    "nodes": [
+      "extract_orders",
+      "transform_orders",
+      "load_warehouse"
+    ],
+    "weighted": true
+  },
+  "nodes": 5,
+  "policies": [],
+  "profile": "generic",
+  "roots": [
+    "extract_orders",
+    "extract_customers"
+  ],
+  "schema_version": 1,
+  "source": "testdata/pipeline.jgf.json",
+  "warnings": [],
+  "widest_generation": [
+    "extract_orders",
+    "extract_customers"
+  ],
+  "width": 2
+}

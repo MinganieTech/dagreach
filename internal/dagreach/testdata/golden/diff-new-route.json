@@ -1,0 +1,65 @@
+{
+  "added_reach": [
+    "payments"
+  ],
+  "after": "testdata/gate-after.dot",
+  "before": "testdata/gate-before.dot",
+  "changed": [
+    "auth"
+  ],
+  "changed_missing_after": [],
+  "changed_missing_before": [],
+  "edge_semantics": "feeds",
+  "edges_added": [
+    [
+      "token",
+      "payments"
+    ]
+  ],
+  "edges_removed": [],
+  "exposures": [
+    {
+      "detail": "new edge token -\u003e payments",
+      "path": [
+        "auth",
+        "token",
+        "payments"
+      ],
+      "reason": "new-edge",
+      "target": "payments"
+    }
+  ],
+  "nodes_added": [],
+  "nodes_removed": [],
+  "policies": [
+    {
+      "detail": "1 target(s) matching group=production became reachable",
+      "failed": true,
+      "matched": [
+        "payments"
+      ],
+      "policy": "fail-on-new-reach",
+      "subject": "group=production",
+      "witnesses": {
+        "payments": [
+          "auth",
+          "token",
+          "payments"
+        ]
+      }
+    }
+  ],
+  "profile": "generic",
+  "reached_after": [
+    "auth",
+    "token",
+    "payments"
+  ],
+  "reached_before": [
+    "auth",
+    "token"
+  ],
+  "removed_reach": [],
+  "schema_version": 1,
+  "warnings": []
+}

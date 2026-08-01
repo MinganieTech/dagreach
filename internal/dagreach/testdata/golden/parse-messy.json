@@ -1,0 +1,27 @@
+{
+  "attributes": {
+    "edges_with_duration": 8,
+    "groups": {
+      "core": 8
+    },
+    "nodes_with_duration": 0,
+    "statuses": {
+      "blocked": 1,
+      "ready": 2
+    }
+  },
+  "directed": true,
+  "duplicate_edges": 0,
+  "edge_semantics": "feeds",
+  "edges": 8,
+  "format": "dot",
+  "name": "pipeline",
+  "nodes": 8,
+  "profile": "generic",
+  "schema_version": 1,
+  "self_loops": 1,
+  "source": "testdata/messy.dot",
+  "warnings": [
+    "the graph is declared 'strict': 1 parallel edge(s) were collapsed"
+  ]
+}

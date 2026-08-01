@@ -1,0 +1,64 @@
+{
+  "acyclic": false,
+  "articulation_points": [
+    "test",
+    "lint"
+  ],
+  "collapsed_cycles": {
+    "scc(build+1)": [
+      "build",
+      "test"
+    ]
+  },
+  "condensed": true,
+  "cycles": [
+    [
+      "build",
+      "test"
+    ]
+  ],
+  "depth": 3,
+  "edge_semantics": "feeds",
+  "edges": 4,
+  "groups": {
+    "ci": 3,
+    "release": 1
+  },
+  "isolated": [],
+  "leaves": [
+    "publish"
+  ],
+  "longest_path": {
+    "cost": 215,
+    "edges": 2,
+    "measure": "duration",
+    "nodes": [
+      "scc(build+1)",
+      "lint",
+      "publish"
+    ],
+    "weighted": true
+  },
+  "nodes": 4,
+  "policies": [
+    {
+      "detail": "1 cycle(s) found",
+      "failed": true,
+      "matched": [
+        "build, test"
+      ],
+      "policy": "fail-on-cycle",
+      "subject": "cycle",
+      "witnesses": {}
+    }
+  ],
+  "profile": "generic",
+  "roots": [],
+  "schema_version": 1,
+  "source": "testdata/cyclic.dot",
+  "warnings": [],
+  "widest_generation": [
+    "scc(build+1)"
+  ],
+  "width": 1
+}
