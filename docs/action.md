@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: terraform graph > infra.dot
-      - uses: MinganieTech/dagreach@v0.1.0-rc.2
+      - uses: MinganieTech/dagreach@v0.1.0-rc.3
         with:
           command: impact
           file: infra.dot
@@ -60,7 +60,7 @@ the event is not a pull request.
 | `limit` | items per list in the comment, `0` for everything |
 | `comment` | post and update a pull-request comment (default `true`) |
 | `comment-tag` | identifies the comment to update |
-| `version` | the released tag to download (default `v0.1.0-rc.2`) |
+| `version` | the released tag to download (default `v0.1.0-rc.3`) |
 | `token` | needs `pull-requests: write`, and downloads the release |
 
 ## Outputs
@@ -99,7 +99,7 @@ report, adds a `::warning::`, and leaves the decision to you: gate on the `verdi
 project wants an unsettled policy to block.
 
 ```yaml
-- uses: MinganieTech/dagreach@v0.1.0-rc.2
+- uses: MinganieTech/dagreach@v0.1.0-rc.3
   id: impact
   with:
     fail-if-reaches: attr:risk=high

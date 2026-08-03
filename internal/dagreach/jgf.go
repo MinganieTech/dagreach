@@ -11,6 +11,7 @@ package dagreach
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ParseJGF parses JSON Graph Format text into a Graph.
@@ -106,12 +107,34 @@ func selectGraphBody(document *Object, graph *Graph, source string) (*Object, er
 	case document.Value("graph") != nil:
 		body = document.Value("graph")
 	default:
+		// Without an envelope, the pair of keys is the only evidence that this
+		// document is a graph at all - and a lone 'nodes' is not evidence. A dbt
+		// manifest carries one, keyed by id exactly like JGF nodes, and used to
+		// be read as nodes with no edges: a graph in which nothing reaches
+		// anything, so every reach policy passes for want of a single edge.
+		// Refusing the file is the only honest answer to a question it cannot
+		// answer.
 		_, hasNodes := document.Get("nodes")
-		_, hasEdges := document.Get("edges")
+		hasEdges := hasEdgeList(document)
 		if !hasNodes && !hasEdges {
 			return nil, &ParseError{
 				Message: "expected a 'graph', 'graphs', or a top-level 'nodes'/'edges' object",
 				Source:  source,
+			}
+		}
+		if !hasNodes || !hasEdges {
+			missing, present := "edges", "nodes"
+			if !hasNodes {
+				missing, present = "nodes", "edges"
+			}
+			return nil, &ParseError{
+				Message: fmt.Sprintf(
+					"this document has a top-level '%s' but no '%s', so nothing says it is a "+
+						"graph rather than any object with a '%s' key; a genuinely edgeless "+
+						"graph declares \"edges\": [], and a producer's export needs its "+
+						"profile (%s)",
+					present, missing, present, strings.Join(ProfileOrder, ", ")),
+				Source: source,
 			}
 		}
 		graph.Warn("the document has no 'graph' envelope; read as a bare nodes/edges object " +
@@ -165,6 +188,18 @@ func readNodes(nodes any, graph *Graph, source string) error {
 		Message: fmt.Sprintf("'nodes' must be an object or an array, found %s", jsonTypeName(nodes)),
 		Source:  source,
 	}
+}
+
+// hasEdgeList reports whether an object declares an edge list under either
+// spelling. Declared and empty is a graph with no edges; absent is a document
+// that never claimed to have any.
+func hasEdgeList(object *Object) bool {
+	for _, key := range []string{"edges", "links"} {
+		if _, present := object.Get(key); present {
+			return true
+		}
+	}
+	return false
 }
 
 func readEdges(body *Object, graph *Graph, source string) error {

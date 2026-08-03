@@ -60,6 +60,10 @@ dagreach diff main/manifest.json pr/manifest.json \
   --changed model.acme.stg_orders --fail-on-new-reach group=exposure
 ```
 
+A manifest is recognised by its `metadata`, or failing that by carrying both `child_map` and
+`parent_map` — the shape that survives when a manifest is committed for a documentation site and
+loses its version markers.
+
 Models, sources, tests, exposures, metrics and semantic models all become nodes, keyed by their
 dbt `unique_id`. `group` is the resource type; `tags`, `materialized`, `schema` and `package_name`
 travel as attributes. Edges come from `child_map`, and fall back to `depends_on.nodes` on older

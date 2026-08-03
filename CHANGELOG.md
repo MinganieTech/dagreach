@@ -4,6 +4,39 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 1.0, a minor bump may break things, and the JSON report carries its own `schema_version` so a
 consumer can tell.
 
+## v0.1.0-rc.3
+
+Closes the last silent wrong answer, found by running dagreach against real
+manifests published on GitHub.
+
+### Behaviour change
+
+**A JSON document with a top-level `nodes` and no edge list is refused** (exit
+`4`) instead of being read as a graph with no edges. A dbt manifest carries a
+`nodes` object keyed by id, exactly like JGF nodes: it loaded as 31 nodes and
+zero edges, a graph in which nothing reaches anything, so every reach policy
+passed for want of a single edge. That is the failure this tool exists to
+prevent, and it was in the reader.
+
+The rule is the distinction dagreach already draws elsewhere between absent and
+empty: `"edges": []` is a graph that declares it has none, and loads; no edge
+key at all is a document that never claimed to be a graph, and is refused with
+a message naming the profiles. Inside a `graph` or `graphs` envelope the
+document has already said it is JGF, so an absent edge list stays legitimate.
+
+If you were feeding dagreach a file that only worked by accident, this is the
+release where it stops. The error says what to pass instead.
+
+### Fixed
+
+- dbt manifests committed for a documentation site are reformatted and lose
+  their `metadata`, so no version marker survives and detection fell through to
+  the generic reader. `child_map` and `parent_map` together are now a second
+  signal - both, since either alone is a plausible key in somebody else's file.
+- Any graph with nodes and no edges now warns that nothing reaches anything and
+  that every reach policy will pass without judging anything. Said once at load
+  time, so it covers every reader and every profile.
+
 ## v0.1.0-rc.2
 
 Fixes one defect in `rc.1`, found by running the published action on all three systems - the first

@@ -836,3 +836,28 @@ func TestNegativeCeilingsAreRefused(t *testing.T) {
 		t.Errorf("--max-impacted 0 refuses any impact at all")
 	}
 }
+
+func TestAGraphWithoutEdgesWarnsThatPoliciesCannotFail(t *testing.T) {
+	path := write(t, "edgeless.jgf.json", `{"nodes": {"a": {"group": "core"}}, "edges": []}`)
+	code, out, _ := runCLI("impact", path, "--changed", "a", "--fail-if-reaches", "group=core")
+	if code != ExitPolicyFailed {
+		t.Fatalf("code = %d: %s", code, out)
+	}
+	if !strings.Contains(out, "no edges, so nothing reaches anything") {
+		t.Errorf("the trap is not named:\n%s", out)
+	}
+}
+
+func TestAManifestReadAsAGraphIsRefusedWithAWayOut(t *testing.T) {
+	// Detection now catches this file, so the generic reader has to be asked for
+	// explicitly - which is exactly the situation of a producer dagreach does
+	// not know: the reader must refuse rather than invent an edgeless graph.
+	code, _, errOut := runCLI("parse", "testdata/dbt-manifest-stripped.json",
+		"--profile", "generic", "--format", "jgf")
+	if code != ExitInputError {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(errOut, "but no 'edges'") || !strings.Contains(errOut, "dbt") {
+		t.Errorf("err = %q", errOut)
+	}
+}

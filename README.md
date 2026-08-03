@@ -14,7 +14,7 @@ DOT carries structure, not meaning: which way an edge points is a convention. **
 that meaning for the producers dagreach knows — Terraform, dbt, CycloneDX — and it warns rather
 than guessing for the ones it does not. See [docs/profiles.md](docs/profiles.md).
 
-> **Status: `v0.1.0-rc.2`, a release candidate before 1.0.** Everything on the roadmap below is
+> **Status: `v0.1.0-rc.3`, a release candidate before 1.0.** Everything on the roadmap below is
 > built. The command line, the exit codes and the JSON report are meant to be stable — but nobody
 > outside the project has used this in anger yet, which is what a release candidate is for. Written
 > in Go and shipped as a single static binary: nothing to install alongside it.
@@ -148,7 +148,10 @@ says how many it hid; the JSON report never truncates.
 
 Ambiguity is refused rather than resolved. A JSON document is one value and then the end of the
 file, and a key declared twice in the same object is an error — the specification says nothing about
-which one wins, so two readers of that file would describe two different graphs. Likewise a flag the
+which one wins, so two readers of that file would describe two different graphs. A document with a
+top-level `nodes` and no edge list is refused too: an edgeless graph declares `"edges": []`, while a
+file that never mentions edges is any object that happens to have a `nodes` key — a dbt manifest,
+for one, which used to load as nodes with no edges and let every reach policy pass. Likewise a flag the
 command does not read is a usage error, never a silent no-op: `diff --fail-if-reaches …` used to
 exit `0` with the policy never evaluated.
 
@@ -180,7 +183,7 @@ is not, they are oriented in opposite directions, so dagreach refuses and asks f
 ```yaml
 - uses: actions/checkout@v4
 - run: terraform graph > infra.dot
-- uses: MinganieTech/dagreach@v0.1.0-rc.2
+- uses: MinganieTech/dagreach@v0.1.0-rc.3
   with:
     command: impact
     file: infra.dot
@@ -232,7 +235,7 @@ HTML report above is a page, not a viewer: it draws no graph and runs no script.
 ## Install
 
 ```bash
-go install github.com/MinganieTech/dagreach/cmd/dagreach@v0.1.0-rc.2
+go install github.com/MinganieTech/dagreach/cmd/dagreach@v0.1.0-rc.3
 ```
 
 Or take a binary from [the releases](https://github.com/MinganieTech/dagreach/releases) — Linux,

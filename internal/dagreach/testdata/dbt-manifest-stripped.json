@@ -1,0 +1,52 @@
+{
+   "disabled" : [],
+   "parent_map" : {
+      "model.shop.stg_orders" : [
+         "source.shop.raw.orders"
+      ],
+      "model.shop.fct_orders" : [
+         "model.shop.stg_orders"
+      ],
+      "test.shop.not_null_fct_orders_id" : [
+         "model.shop.fct_orders"
+      ]
+   },
+   "child_map" : {
+      "source.shop.raw.orders" : [
+         "model.shop.stg_orders"
+      ],
+      "model.shop.stg_orders" : [
+         "model.shop.fct_orders"
+      ],
+      "model.shop.fct_orders" : [
+         "test.shop.not_null_fct_orders_id"
+      ],
+      "test.shop.not_null_fct_orders_id" : []
+   },
+   "nodes" : {
+      "model.shop.stg_orders" : {
+         "resource_type" : "model",
+         "name" : "stg_orders",
+         "package_name" : "shop",
+         "config" : { "materialized" : "view" }
+      },
+      "model.shop.fct_orders" : {
+         "resource_type" : "model",
+         "name" : "fct_orders",
+         "package_name" : "shop",
+         "config" : { "materialized" : "table" }
+      },
+      "test.shop.not_null_fct_orders_id" : {
+         "resource_type" : "test",
+         "name" : "not_null_fct_orders_id",
+         "package_name" : "shop"
+      }
+   },
+   "sources" : {
+      "source.shop.raw.orders" : {
+         "resource_type" : "source",
+         "name" : "orders",
+         "package_name" : "shop"
+      }
+   }
+}

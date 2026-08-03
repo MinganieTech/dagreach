@@ -75,6 +75,14 @@ func LoadGraph(path string, options LoadOptions) (*Graph, error) {
 	if chosen.Name == "generic" {
 		WarnIfOrientationIsSuspect(graph, options.EdgeSemantics)
 	}
+	// Nodes and no edges is a legitimate answer to `parse` and a trap for
+	// everything else: nothing reaches anything, so every reach policy passes
+	// without judging a thing. Said once here rather than in each reader,
+	// because every reader can produce one.
+	if graph.NodeCount() > 0 && graph.EdgeCount() == 0 {
+		graph.Warn("this graph has no edges, so nothing reaches anything and every " +
+			"reach policy passes without judging anything")
+	}
 	return graph, nil
 }
 

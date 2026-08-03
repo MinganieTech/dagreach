@@ -295,13 +295,24 @@ func dbtAttrs(uniqueID string, entry *Object) map[string]string {
 	return attrs
 }
 
+// detectDBT recognises a manifest by its metadata, and failing that by the two
+// dependency maps only dbt writes.
+//
+// The second test earns its place on real files: a manifest that has been
+// reformatted or stripped of `metadata` - which happens whenever one is
+// committed for a documentation site - carries no version marker at all and
+// used to fall through to the generic reader.
 func detectDBT(text string) bool {
 	head := text
 	if len(head) > 4000 {
 		head = head[:4000]
 	}
-	return strings.Contains(head, `"dbt_schema_version"`) ||
-		(strings.Contains(head, `"dbt_version"`) && strings.Contains(head, `"nodes"`))
+	if strings.Contains(head, `"dbt_schema_version"`) ||
+		(strings.Contains(head, `"dbt_version"`) && strings.Contains(head, `"nodes"`)) {
+		return true
+	}
+	// Both maps, because either alone is a plausible key in somebody else's file.
+	return strings.Contains(head, `"child_map"`) && strings.Contains(head, `"parent_map"`)
 }
 
 // -- cyclonedx -------------------------------------------------------------

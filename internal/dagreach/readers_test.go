@@ -180,3 +180,74 @@ func TestAKeyDeclaredTwiceMakesTheDocumentAmbiguous(t *testing.T) {
 		t.Errorf("the same key in two different objects is ordinary JSON: %v", err)
 	}
 }
+
+// -- a document that is not a graph ----------------------------------------
+
+func TestAnObjectWithNodesButNoEdgesIsNotAGraph(t *testing.T) {
+	// The failure this closes: a dbt manifest carries a `nodes` object keyed by
+	// id, exactly like JGF nodes. It used to load as nodes with no edges - a
+	// graph in which nothing reaches anything, so every reach policy passed.
+	_, err := ParseJGF(`{"nodes": {"a": {}, "b": {}}, "something_else": true}`, "manifest.json")
+	if err == nil {
+		t.Fatal("an object with a 'nodes' key was read as a graph")
+	}
+	for _, fragment := range []string{"but no 'edges'", `"edges": []`, "dbt"} {
+		if !strings.Contains(err.Error(), fragment) {
+			t.Errorf("missing %q in %q", fragment, err.Error())
+		}
+	}
+	if _, isParse := err.(*ParseError); !isParse {
+		t.Errorf("expected a ParseError, got %T", err)
+	}
+}
+
+func TestEdgesWithoutNodesIsRefusedTheSameWay(t *testing.T) {
+	if _, err := ParseJGF(`{"edges": [], "x": 1}`, "x.json"); err == nil {
+		t.Error("an object with only an 'edges' key was read as a graph")
+	}
+}
+
+func TestAnEdgelessGraphSaysSoRatherThanBeingRefused(t *testing.T) {
+	// Declared and empty is a graph with no edges; absent is a document that
+	// never claimed to have any. The difference is the whole fix.
+	graph, err := ParseJGF(`{"nodes": {"a": {}, "b": {}}, "edges": []}`, "empty.json")
+	if err != nil {
+		t.Fatalf("a declared edgeless graph must load: %v", err)
+	}
+	if graph.NodeCount() != 2 || graph.EdgeCount() != 0 {
+		t.Errorf("nodes=%d edges=%d", graph.NodeCount(), graph.EdgeCount())
+	}
+	// `links` is the other accepted spelling, and counts as declared too.
+	if _, err := ParseJGF(`{"nodes": {"a": {}}, "links": []}`, "links.json"); err != nil {
+		t.Errorf("'links' declares an edge list too: %v", err)
+	}
+}
+
+func TestAGraphEnvelopeDoesNotNeedAnEdgeList(t *testing.T) {
+	// Inside an envelope the document has already said it is JGF, so an absent
+	// edge list is an edgeless graph rather than a document of unknown kind.
+	graph, err := ParseJGF(`{"graph": {"nodes": {"a": {}}}}`, "enveloped.json")
+	if err != nil || graph.NodeCount() != 1 {
+		t.Fatalf("graph=%v err=%v", graph, err)
+	}
+}
+
+func TestAStrippedDBTManifestIsStillRecognised(t *testing.T) {
+	// A manifest committed for a documentation site is reformatted and loses
+	// `metadata`, so no version marker survives. The two dependency maps do.
+	text := fixtureText(t, "testdata/dbt-manifest-stripped.json")
+	if profile := DetectProfile(text); profile == nil || profile.Name != "dbt" {
+		t.Fatalf("detected as %v", profile)
+	}
+	graph := load(t, "testdata/dbt-manifest-stripped.json", LoadOptions{})
+	if graph.NodeCount() != 4 || graph.EdgeCount() != 3 {
+		t.Errorf("nodes=%d edges=%d, wanted the source, two models and the test",
+			graph.NodeCount(), graph.EdgeCount())
+	}
+}
+
+func TestOneMapAloneIsNotEnoughToClaimAFile(t *testing.T) {
+	if DetectProfile(`{"child_map": {}, "nodes": {}}`) != nil {
+		t.Error("'child_map' alone is a plausible key in somebody else's file")
+	}
+}
